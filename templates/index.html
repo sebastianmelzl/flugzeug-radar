@@ -817,11 +817,12 @@ async function announce(f) {
     speak(buildSpeechText(f));
 }
 
-function speakFlight(id) {
+async function speakFlight(id) {
     const f = currentFlights.find(f => f.id === id);
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
-    if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 4000); }
+    if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
+    await playChime();
     speak(buildSpeechText(f));
 }
 
