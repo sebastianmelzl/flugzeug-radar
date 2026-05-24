@@ -846,7 +846,7 @@ function renderCompactCard(f) {
 }
 
 const GLIDER_CODES = new Set(['GLID','BALL','ULAC','GYRO','PARA','HANG']);
-const isCompact = f => (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code);
+function isCompact(f) { return (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code); }
 
 /* ── Render card ── */
 function renderCard(f, isNew) {
