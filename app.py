@@ -214,6 +214,25 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/admin/fix-future")
+def fix_future():
+    fixed_total = 0
+    with sqlite3.connect(DB_PATH) as conn:
+        # Repeat until no more future entries remain
+        for _ in range(5):
+            conn.execute("""
+                UPDATE sightings
+                SET hour = (hour - 2 + 24) % 24,
+                    timestamp = datetime(timestamp, '-2 hours')
+                WHERE timestamp > datetime('now', 'localtime', '+10 minutes')
+            """)
+            n = conn.execute("SELECT changes()").fetchone()[0]
+            fixed_total += n
+            if n == 0:
+                break
+    return jsonify({"fixed": fixed_total})
+
+
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
 def delete_sighting(sighting_id):
     try:
