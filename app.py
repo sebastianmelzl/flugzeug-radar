@@ -174,12 +174,17 @@ def save_sighting(f):
         )
 
 
+_last_payload = {"flights": [], "source": ""}
+
+
 def _background_poller():
     logged_ids = set()
     while True:
         try:
             flights, source = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=150)
-            socketio.emit("flights_update", {"flights": flights, "source": source})
+            payload = {"flights": flights, "source": source}
+            _last_payload.update(payload)
+            socketio.emit("flights_update", payload)
             current_ids = {f["id"] for f in flights}
             for f in flights:
                 if (f["distance_km"] <= SIGHTING_RADIUS_KM
@@ -196,6 +201,12 @@ def _background_poller():
 
 
 socketio.start_background_task(_background_poller)
+
+
+@socketio.on("connect")
+def on_connect():
+    if _last_payload["flights"]:
+        socketio.emit("flights_update", _last_payload, to=request.sid)
 
 
 @app.route("/")
