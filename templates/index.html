@@ -1014,7 +1014,10 @@ async function loadFlights() {
             return;
         }
 
-        list.innerHTML = flights.map(f => renderCard(f, false)).join('');
+        const isCompact = f => (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code);
+        const main    = flights.filter(f => !isCompact(f));
+        const compact = flights.filter(f =>  isCompact(f));
+        list.innerHTML = [...main, ...compact].map(f => renderCard(f, false)).join('');
 
     } catch(e) { showToast('⚠ JS: ' + e.message, '#ef4444'); console.error(e); }
 }
