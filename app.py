@@ -228,14 +228,14 @@ def fix_hours():
         sample = [dict(r) for r in conn.execute(
             "SELECT id, hour, timestamp, date FROM sightings ORDER BY id DESC LIMIT 20"
         ).fetchall()]
-        # Fix by timestamp string content, not hour column
+        # Old entries use space separator "2026-05-24 08:31:15", new use T+tz
         conn.execute("""UPDATE sightings SET hour = 10,
-            timestamp = REPLACE(timestamp, 'T06:', 'T10:')
-            WHERE timestamp LIKE '%T06:%'""")
+            timestamp = REPLACE(timestamp, ' 06:', ' 10:')
+            WHERE timestamp LIKE '% 06:%'""")
         n6 = conn.execute("SELECT changes()").fetchone()[0]
         conn.execute("""UPDATE sightings SET hour = 10,
-            timestamp = REPLACE(timestamp, 'T08:', 'T10:')
-            WHERE timestamp LIKE '%T08:%'""")
+            timestamp = REPLACE(timestamp, ' 08:', ' 10:')
+            WHERE timestamp LIKE '% 08:%'""")
         n8 = conn.execute("SELECT changes()").fetchone()[0]
     return jsonify({"fixed_06": n6, "fixed_08": n8, "date": today, "sample_before": sample})
 
