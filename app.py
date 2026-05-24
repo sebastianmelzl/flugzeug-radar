@@ -223,6 +223,12 @@ def get_flights():
 
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
 def delete_sighting(sighting_id):
+    if IS_MACOS:
+        try:
+            resp = requests.delete(f"{RAILWAY_URL}/api/sighting/{sighting_id}", timeout=10)
+            return jsonify(resp.json())
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute("DELETE FROM sightings WHERE id = ?", (sighting_id,))
