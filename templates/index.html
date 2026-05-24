@@ -989,8 +989,8 @@ async function loadFlights() {
         const newIds = new Set(flights.map(f => f.id));
         previousIds = newIds;
 
-        // Announce flights newly entering the 3km overhead zone
-        flights.filter(f => f.distance_km <= 3).forEach(f => {
+        // Announce flights newly entering the overhead zone (1km for GA/gliders, 3km for airliners)
+        flights.filter(f => f.distance_km <= (isCompact(f) ? 1 : 3)).forEach(f => {
             if (!announcedOverhead.has(f.id)) {
                 announcedOverhead.add(f.id);
                 announce(f);
