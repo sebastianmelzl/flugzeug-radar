@@ -850,9 +850,7 @@ function isCompact(f) { return (!f.airline_iata && !f.airline_icao) || GLIDER_CO
 
 /* ── Render card ── */
 function renderCard(f, isNew) {
-    const noAirline = !f.airline_iata && !f.airline_icao;
-    const isGlider = GLIDER_CODES.has(f.aircraft_code);
-    if (noAirline || isGlider) return renderCompactCard(f);
+    if (isCompact(f) && f.distance_km > 1) return renderCompactCard(f);
 
     const status = approachStatus(f);
 
