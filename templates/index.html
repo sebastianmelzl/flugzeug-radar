@@ -846,6 +846,7 @@ function renderCompactCard(f) {
 }
 
 const GLIDER_CODES = new Set(['GLID','BALL','ULAC','GYRO','PARA','HANG']);
+const isCompact = f => (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code);
 
 /* ── Render card ── */
 function renderCard(f, isNew) {
@@ -1014,7 +1015,6 @@ async function loadFlights() {
             return;
         }
 
-        const isCompact = f => (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code);
         const main    = flights.filter(f => !isCompact(f));
         const compact = flights.filter(f =>  isCompact(f));
         list.innerHTML = [...main, ...compact].map(f => renderCard(f, false)).join('');
