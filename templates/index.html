@@ -893,7 +893,12 @@ async function playDing() {
     } catch {}
 }
 
+async function spotifyPause() {
+    try { await fetch('/api/spotify/pause', { method: 'POST' }); } catch {}
+}
+
 async function announce(f) {
+    await spotifyPause();
     await playChime();
     speak(buildSpeechText(f));
 }
@@ -903,6 +908,7 @@ async function speakFlight(id) {
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
+    await spotifyPause();
     await playChime();
     speak(buildSpeechText(f));
 }

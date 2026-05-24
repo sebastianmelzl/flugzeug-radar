@@ -1,5 +1,6 @@
 import sys
 import os
+import threading
 
 IS_MACOS = sys.platform == "darwin"
 
@@ -304,6 +305,52 @@ def get_stats():
 
 
 _speak_process = None
+_spotify_was_playing = False
+
+
+def _osascript(script):
+    try:
+        return subprocess.run(["osascript", "-e", script],
+                              capture_output=True, text=True, timeout=3).stdout.strip()
+    except Exception:
+        return ""
+
+
+def _spotify_pause():
+    global _spotify_was_playing
+    state = _osascript('tell application "Spotify" to return player state as string')
+    _spotify_was_playing = (state == "playing")
+    if _spotify_was_playing:
+        _osascript('tell application "Spotify" to pause')
+
+
+def _spotify_resume():
+    if _spotify_was_playing:
+        _osascript('tell application "Spotify" to play')
+
+
+def _speak_background(text, mp3_path):
+    global _speak_process
+    try:
+        subprocess.run(
+            ["python3", "-m", "edge_tts", "--voice", "de-DE-KatjaNeural",
+             "--text", text, "--write-media", mp3_path],
+            check=True
+        )
+        _speak_process = subprocess.Popen(["afplay", mp3_path])
+    except Exception:
+        _speak_process = subprocess.Popen(["say", "-v", "Anna", "-r", "160", text])
+    if _speak_process:
+        _speak_process.wait()
+    _spotify_resume()
+
+
+@app.route("/api/spotify/pause", methods=["POST"])
+def spotify_pause():
+    if not IS_MACOS:
+        return jsonify({"ok": False}), 200
+    _spotify_pause()
+    return jsonify({"ok": True, "was_playing": _spotify_was_playing})
 
 
 @app.route("/api/speak", methods=["POST"])
@@ -317,17 +364,8 @@ def speak():
     if _speak_process and _speak_process.poll() is None:
         _speak_process.terminate()
     mp3_path = "/tmp/flugzeug_radar_speech.mp3"
-    try:
-        subprocess.run(
-            ["python3", "-m", "edge_tts", "--voice", "de-DE-KatjaNeural",
-             "--text", text, "--write-media", mp3_path],
-            check=True
-        )
-        _speak_process = subprocess.Popen(["afplay", mp3_path])
-        return jsonify({"ok": True})
-    except Exception as e:
-        _speak_process = subprocess.Popen(["say", "-v", "Anna", "-r", "160", text])
-        return jsonify({"ok": True, "fallback": str(e)})
+    threading.Thread(target=_speak_background, args=(text, mp3_path), daemon=True).start()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
