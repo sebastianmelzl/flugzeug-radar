@@ -220,28 +220,6 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/admin/fix-hours")
-def fix_hours():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        before = [dict(r) for r in conn.execute(
-            "SELECT id, hour, timestamp FROM sightings ORDER BY id DESC LIMIT 20"
-        ).fetchall()]
-        # Old entries: "2026-05-24 06:41:12" — chars 12-13 (1-based) are the hour
-        c6 = conn.execute("""UPDATE sightings
-            SET hour = 10,
-                timestamp = SUBSTR(timestamp,1,11) || '10' || SUBSTR(timestamp,14)
-            WHERE LENGTH(timestamp) = 19 AND SUBSTR(timestamp,12,2) = '06'""")
-        c8 = conn.execute("""UPDATE sightings
-            SET hour = 10,
-                timestamp = SUBSTR(timestamp,1,11) || '10' || SUBSTR(timestamp,14)
-            WHERE LENGTH(timestamp) = 19 AND SUBSTR(timestamp,12,2) = '08'""")
-        after = [dict(r) for r in conn.execute(
-            "SELECT id, hour, timestamp FROM sightings ORDER BY id DESC LIMIT 20"
-        ).fetchall()]
-    return jsonify({"fixed_06": c6.rowcount, "fixed_08": c8.rowcount,
-                    "before": before, "after": after})
-
 
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
 def delete_sighting(sighting_id):
