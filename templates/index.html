@@ -310,9 +310,9 @@
         <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
         <span class="meta">Aktualisierung in <b id="countdown">5</b>s</span>
         <select id="radiusSelect">
-            <option value="10">10 km</option>
+            <option value="10" selected>10 km</option>
             <option value="25">25 km</option>
-            <option value="50" selected>50 km</option>
+            <option value="50">50 km</option>
             <option value="100">100 km</option>
             <option value="150">150 km</option>
         </select>
@@ -828,8 +828,8 @@ function renderCard(f, isNew) {
     // Status pill color
 
     return `
-    <div class="card ${isNew?'new-flight':''} ${f.distance_km<=2?'overhead':''}" id="card-${f.id}">
-        ${f.distance_km<=2 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
+    <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''}" id="card-${f.id}">
+        ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
 
         <!-- Section 1: Identity -->
         <div class="sec sec-identity">
@@ -942,8 +942,8 @@ async function loadFlights() {
             }
         });
 
-        // Announce flights newly entering the 2km overhead zone
-        flights.filter(f => f.distance_km <= 2).forEach(f => {
+        // Announce flights newly entering the 3km overhead zone
+        flights.filter(f => f.distance_km <= 3).forEach(f => {
             if (!announcedOverhead.has(f.id)) {
                 announcedOverhead.add(f.id);
                 announce(f);
