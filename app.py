@@ -8,6 +8,9 @@ import sys
 import threading
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TZ = ZoneInfo("Europe/Berlin")
 
 app = Flask(__name__)
 
@@ -143,7 +146,7 @@ def fetch_flights(lat, lon, radius_km):
 
 
 def save_sighting(f):
-    now = datetime.now()
+    now = datetime.now(tz=TZ)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """INSERT INTO sightings
