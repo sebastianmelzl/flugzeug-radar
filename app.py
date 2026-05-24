@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 TZ = ZoneInfo("Europe/Berlin")
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 _async_mode = "threading" if IS_MACOS else "gevent"
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 
