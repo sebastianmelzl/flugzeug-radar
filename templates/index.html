@@ -1172,9 +1172,10 @@ function updateMap(allFlights) {
         const overhead = f.distance_km <= (isCompact(f) ? 1 : 3);
         const color = overhead ? '#f97316' : inRadius ? '#00d4aa' : '#475569';
         const size  = isCompact(f) ? 14 : 20;
+        const box = size + 10;
         const icon  = L.divIcon({
-            html: `<div class="flight-marker" style="color:${color};font-size:${size}px;transform:rotate(${f.heading||0}deg)">✈</div>`,
-            iconSize: [size, size], iconAnchor: [size/2, size/2], className: ''
+            html: `<div style="width:${box}px;height:${box}px;display:flex;align-items:center;justify-content:center;color:${color};font-size:${size}px;transform:rotate(${(f.heading||0)-45}deg);filter:drop-shadow(0 0 3px #000c)">✈</div>`,
+            iconSize: [box, box], iconAnchor: [box/2, box/2], className: ''
         });
         const popup = `<b>${f.callsign||f.id}</b><br>${f.airline_iata||f.airline_icao||'–'} · ${f.aircraft_code||'–'}<br>${f.origin_airport_iata||'?'} → ${f.destination_airport_iata||'?'}<br>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de')+' ft' : '–'} · ${f.distance_km} km`;
 
