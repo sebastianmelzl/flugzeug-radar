@@ -207,13 +207,6 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/admin/cleanup-test")
-def cleanup_test():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM sightings WHERE flight_id = 'test1'")
-    return jsonify({"ok": True})
-
-
 @app.route("/api/stats")
 def get_stats():
     # Locally: proxy to Railway so both views show the same 24/7 data
