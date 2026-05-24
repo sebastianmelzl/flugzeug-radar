@@ -204,10 +204,15 @@ const AIRLINES = {
     QF:'Qantas',NZ:'Air New Zealand',
     AA:'American Airlines',UA:'United Airlines',DL:'Delta Air Lines',
     WN:'Southwest Airlines',AS:'Alaska Airlines',B6:'JetBlue',AC:'Air Canada',WS:'WestJet',
+    W6:'Wizz Air',
     EJA:'NetJets',JAR:'Jaro International',
     CV:'Cargolux','5X':'UPS Airlines',FX:'FedEx Express',
     DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian Airlines',
     CFG:'Condor',SWU:'Sundair',TUI:'TUI fly',RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',
+    SXS:'SunExpress',DLA:'Air Dolomiti',OCN:'Eurowings Discover',
+    NOZ:'Norwegian Air International',BEL:'Brussels Airlines',
+    ITY:'ITA Airways',CPA:'Cathay Pacific',ELY:'El Al',
+    TKJ:'Ajet',
     BAW:'British Airways',EIN:'Aer Lingus',KLM:'KLM',TRA:'Transavia',
     AFR:'Air France',IBE:'Iberia',TAP:'TAP Air Portugal',
     SAS:'SAS Scandinavian',FIN:'Finnair',BTI:'airBaltic',
@@ -235,6 +240,33 @@ const AIRCRAFT = {
     CRJ2:'CRJ-200',CRJ7:'CRJ-700',CRJ9:'CRJ-900',
     AT75:'ATR 72-500',AT76:'ATR 72-600',DH8D:'Q400',
 };
+
+const AIRPORTS = {
+    FRA:'Frankfurt',MUC:'München',BER:'Berlin',HAM:'Hamburg',DUS:'Düsseldorf',
+    STR:'Stuttgart',CGN:'Köln/Bonn',NUE:'Nürnberg',SZG:'Salzburg',GRZ:'Graz',
+    VIE:'Wien',ZRH:'Zürich',GVA:'Genf',BSL:'Basel',
+    LHR:'London Heathrow',LGW:'London Gatwick',LTN:'London Luton',STN:'London Stansted',
+    MAN:'Manchester',EDI:'Edinburgh',CDG:'Paris CDG',ORY:'Paris Orly',
+    AMS:'Amsterdam',BRU:'Brüssel',FCO:'Rom Fiumicino',MXP:'Mailand Malpensa',
+    LIN:'Mailand Linate',BGY:'Bergamo',NAP:'Neapel',BLQ:'Bologna',
+    FLR:'Florenz',PSA:'Pisa',TRS:'Triest',BZO:'Bozen',
+    BCN:'Barcelona',MAD:'Madrid',PMI:'Palma de Mallorca',
+    CPH:'Kopenhagen',GOT:'Göteborg',ARN:'Stockholm',OSL:'Oslo',HEL:'Helsinki',
+    WAW:'Warschau',PRG:'Prag',BUD:'Budapest',OTP:'Bukarest',SOF:'Sofia',
+    ZAG:'Zagreb',BEG:'Belgrad',LJU:'Ljubljana',SJJ:'Sarajevo',
+    SKP:'Skopje',TIA:'Tirana',TIV:'Tivat',DBV:'Dubrovnik',
+    SKG:'Thessaloniki',ATH:'Athen',HER:'Heraklion',JTR:'Santorin',KLX:'Kalamata',
+    IST:'Istanbul',SAW:'Istanbul Sabiha',ADB:'İzmir',AYT:'Antalya',
+    BJV:'Bodrum',DLM:'Dalaman',
+    TLV:'Tel Aviv',LCA:'Larnaka',
+    CAI:'Kairo',HRG:'Hurghada',SSH:'Scharm el-Scheich',
+    JED:'Dschidda',DOH:'Doha',DXB:'Dubai',AUH:'Abu Dhabi',
+    HKG:'Hongkong',IAD:'Washington Dulles',
+    QCP:'Schwäbisch Hall',QEF:'Frankfurt Egelsbach',
+};
+function airportName(code) {
+    return AIRPORTS[code] || code || '–';
+}
 
 function airlineName(iata, icao) {
     return AIRLINES[iata] || AIRLINES[icao] || iata || icao || '–';
@@ -281,8 +313,8 @@ function renderRecent(rows) {
             <td class="mono">${r.callsign || '–'}</td>
             <td>${airlineName(r.airline_iata, r.airline_icao)}</td>
             <td>${aircraftName(r.aircraft_code)}</td>
-            <td>${r.origin_airport_iata || '–'}</td>
-            <td>${r.destination_airport_iata || '–'}</td>
+            <td title="${airportName(r.origin_airport_iata)}">${r.origin_airport_iata || '–'}</td>
+            <td title="${airportName(r.destination_airport_iata)}">${r.destination_airport_iata || '–'}</td>
             <td>${r.distance_km ? r.distance_km.toFixed(1) + ' km' : '–'}</td>
             <td>${r.altitude_ft ? Math.round(r.altitude_ft).toLocaleString('de') + ' ft' : '–'}</td>
             <td>${r.ground_speed_kmh ? r.ground_speed_kmh + ' km/h' : '–'}</td>
