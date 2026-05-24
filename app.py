@@ -224,15 +224,20 @@ def get_flights():
 def fix_hours():
     today = datetime.now(tz=TZ).strftime("%Y-%m-%d")
     with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        sample = [dict(r) for r in conn.execute(
+            "SELECT id, hour, timestamp, date FROM sightings ORDER BY id DESC LIMIT 20"
+        ).fetchall()]
+        # Fix by timestamp string content, not hour column
         conn.execute("""UPDATE sightings SET hour = 10,
             timestamp = REPLACE(timestamp, 'T06:', 'T10:')
-            WHERE hour = 6 AND date = ?""", (today,))
+            WHERE timestamp LIKE '%T06:%'""")
         n6 = conn.execute("SELECT changes()").fetchone()[0]
         conn.execute("""UPDATE sightings SET hour = 10,
             timestamp = REPLACE(timestamp, 'T08:', 'T10:')
-            WHERE hour = 8 AND date = ?""", (today,))
+            WHERE timestamp LIKE '%T08:%'""")
         n8 = conn.execute("SELECT changes()").fetchone()[0]
-    return jsonify({"fixed_hour6": n6, "fixed_hour8": n8, "date": today})
+    return jsonify({"fixed_06": n6, "fixed_08": n8, "date": today, "sample_before": sample})
 
 
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
