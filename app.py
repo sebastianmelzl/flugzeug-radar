@@ -4,8 +4,8 @@ import os
 IS_MACOS = sys.platform == "darwin"
 
 if not IS_MACOS:
-    import eventlet
-    eventlet.monkey_patch()
+    from gevent import monkey
+    monkey.patch_all()
 
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 TZ = ZoneInfo("Europe/Berlin")
 
 app = Flask(__name__)
-_async_mode = "threading" if IS_MACOS else "eventlet"
+_async_mode = "threading" if IS_MACOS else "gevent"
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 
 DEFAULT_LAT = 49.83580017089844

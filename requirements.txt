@@ -4,4 +4,5 @@ FlightRadarAPI
 requests
 edge-tts
 flask-socketio
-eventlet
+gevent
+gevent-websocket
