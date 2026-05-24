@@ -336,13 +336,15 @@ def _speak_background(text, mp3_path, should_resume):
             subprocess.run(
                 ["python3", "-m", "edge_tts", "--voice", "de-DE-KatjaNeural",
                  "--text", text, "--write-media", mp3_path],
-                check=True
+                check=True, timeout=12  # edge_tts braucht Netzwerk → Timeout nötig
             )
             _speak_process = subprocess.Popen(["afplay", mp3_path])
         except Exception:
             _speak_process = subprocess.Popen(["say", "-v", "Anna", "-r", "160", text])
         if _speak_process:
-            _speak_process.wait()
+            _speak_process.wait(timeout=120)
+    except Exception:
+        pass
     finally:
         if should_resume:
             _osascript('tell application "Spotify" to play')
