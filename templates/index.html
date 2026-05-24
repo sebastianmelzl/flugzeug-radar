@@ -308,7 +308,7 @@
     <div class="logo">✈ Flugzeug Radar</div>
     <div class="controls">
         <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
-        <span class="meta">Aktualisierung in <b id="countdown">5</b>s</span>
+        <span class="meta">Aktualisierung in <b id="countdown">10</b>s</span>
         <select id="radiusSelect">
             <option value="10" selected>10 km</option>
             <option value="25">25 km</option>
@@ -338,7 +338,7 @@ let previousIds = new Set();
 let announcedOverhead = new Set();
 let loggedSightings = new Set();
 let currentFlights = [];
-let countdownVal = 5, countdownInterval;
+let countdownVal = 10, countdownInterval;
 
 /* ── Airline lookup (IATA + ICAO) ── */
 const AIRLINES = {
@@ -976,8 +976,8 @@ async function loadFlights() {
 /* ── Countdown ── */
 function startCountdown() {
     clearInterval(countdownInterval);
-    countdownVal = 5;
-    document.getElementById('countdown').textContent = 5;
+    countdownVal = 10;
+    document.getElementById('countdown').textContent = 10;
     countdownInterval = setInterval(() => {
         countdownVal--;
         document.getElementById('countdown').textContent = countdownVal;
