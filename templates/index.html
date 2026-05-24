@@ -408,6 +408,8 @@ const DEFAULT_LON = {{ default_lon }};
 const IS_LOCAL = {{ 'true' if is_local else 'false' }};
 let userLat = DEFAULT_LAT, userLon = DEFAULT_LON;
 let previousIds = new Set();
+let dingedIds = new Set();
+let _firstRender = true;
 let announcedOverhead = new Set();
 let currentFlights = [];
 let _map = null, _markers = {};
@@ -870,6 +872,21 @@ function playChime() {
     });
 }
 
+async function playDing() {
+    try {
+        const ctx = await getAudioCtx();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = 880;
+        const t = ctx.currentTime;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.35, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+        osc.start(t); osc.stop(t + 0.4);
+    } catch {}
+}
+
 async function announce(f) {
     await playChime();
     speak(buildSpeechText(f));
@@ -1119,10 +1136,27 @@ function renderCard(f, isNew) {
 /* ── Render flights from data ── */
 function renderFlights(flights, source) {
     const newIds = new Set(flights.map(f => f.id));
+    const oldIds = previousIds;
     previousIds = newIds;
     currentFlights = flights;
 
     if (IS_LOCAL) {
+        // Ding for new flights that are approaching
+        if (!_firstRender) {
+            flights.forEach(f => {
+                if (!oldIds.has(f.id) && !dingedIds.has(f.id)) {
+                    const st = approachStatus(f);
+                    if (st && st.label === 'Auf dich zu') {
+                        dingedIds.add(f.id);
+                        playDing();
+                    }
+                }
+            });
+        }
+        _firstRender = false;
+        for (const id of dingedIds) { if (!newIds.has(id)) dingedIds.delete(id); }
+
+        // Full chime + announce when directly overhead
         flights.filter(f => f.distance_km <= (isCompact(f) ? 1 : 3)).forEach(f => {
             if (!announcedOverhead.has(f.id)) {
                 announcedOverhead.add(f.id);
