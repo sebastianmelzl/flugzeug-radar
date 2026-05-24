@@ -769,23 +769,45 @@ function playChime() {
     return new Promise(resolve => {
         try {
             const ctx = getAudioCtx();
-            const freqs = [740, 554]; // F#5 → C#5 — klassischer Flughafen-Zweiklang
-            let t = ctx.currentTime + 0.05;
-            freqs.forEach(freq => {
-                const osc  = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.type = 'sine';
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(0.35, t + 0.03);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
-                osc.start(t);
-                osc.stop(t + 0.7);
-                t += 0.55;
-            });
-            setTimeout(resolve, 1350);
+
+            // Master gain + soft compressor so it doesn't clip
+            const comp = ctx.createDynamicsCompressor();
+            comp.connect(ctx.destination);
+            const master = ctx.createGain();
+            master.gain.value = 0.55;
+            master.connect(comp);
+
+            // Inharmonic partials of a real bell (ratio, relative volume, decay multiplier)
+            const partials = [
+                [1.000, 1.00, 2.8],
+                [2.000, 0.30, 1.2],
+                [2.756, 0.55, 1.0],  // characteristic bell partial
+                [5.404, 0.18, 0.6],
+                [8.933, 0.08, 0.4],
+            ];
+
+            function bell(freq, startTime) {
+                partials.forEach(([ratio, vol, decay]) => {
+                    const osc = ctx.createOscillator();
+                    const g   = ctx.createGain();
+                    osc.connect(g);
+                    g.connect(master);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq * ratio;
+                    g.gain.setValueAtTime(0, startTime);
+                    g.gain.linearRampToValueAtTime(vol, startTime + 0.008);
+                    g.gain.exponentialRampToValueAtTime(0.0001, startTime + decay);
+                    osc.start(startTime);
+                    osc.stop(startTime + decay + 0.05);
+                });
+            }
+
+            // 3-tone ascending chime: C5 → E5 → G5  (classic European airport)
+            const notes = [523.25, 659.25, 783.99];
+            let t = ctx.currentTime + 0.08;
+            notes.forEach(freq => { bell(freq, t); t += 0.52; });
+
+            setTimeout(resolve, 2400);
         } catch { resolve(); }
     });
 }
