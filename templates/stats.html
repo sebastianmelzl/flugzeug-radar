@@ -74,6 +74,13 @@
         tr:hover td { color: #e2e8f0; }
 
         .empty { color: #334155; font-size: 14px; text-align: center; padding: 40px; }
+
+        .del-btn {
+            background: none; border: 1px solid transparent; color: #334155;
+            font-size: 14px; cursor: pointer; border-radius: 5px;
+            padding: 2px 7px; transition: all .15s;
+        }
+        .del-btn:hover { border-color: #ef4444; color: #ef4444; background: #ef444415; }
     </style>
 </head>
 <body>
@@ -153,9 +160,10 @@
                         <th>Distanz</th>
                         <th>Höhe</th>
                         <th>Speed</th>
+                        <th></th>
                     </tr>
                 </thead>
-                <tbody id="recentTable"><tr><td colspan="9" class="empty">Noch keine Daten</td></tr></tbody>
+                <tbody id="recentTable"><tr><td colspan="10" class="empty">Noch keine Daten</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -237,7 +245,7 @@ function renderRecent(rows) {
         const ts = new Date(r.timestamp);
         const time = ts.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
                    + ' ' + ts.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-        return `<tr>
+        return `<tr id="row-${r.id}">
             <td>${time}</td>
             <td class="mono">${r.callsign || '–'}</td>
             <td>${airlineName(r.airline_iata, r.airline_icao)}</td>
@@ -247,8 +255,17 @@ function renderRecent(rows) {
             <td>${r.distance_km ? r.distance_km.toFixed(1) + ' km' : '–'}</td>
             <td>${r.altitude_ft ? Math.round(r.altitude_ft).toLocaleString('de') + ' ft' : '–'}</td>
             <td>${r.ground_speed_kmh ? r.ground_speed_kmh + ' km/h' : '–'}</td>
+            <td><button class="del-btn" onclick="deleteSighting(${r.id})">✕</button></td>
         </tr>`;
     }).join('');
+}
+
+async function deleteSighting(id) {
+    if (!confirm('Eintrag löschen?')) return;
+    const resp = await fetch(`/api/sighting/${id}`, { method: 'DELETE' });
+    if (resp.ok) {
+        document.getElementById(`row-${id}`)?.remove();
+    }
 }
 
 async function loadStats() {

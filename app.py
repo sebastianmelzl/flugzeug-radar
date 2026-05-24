@@ -214,17 +214,14 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/admin/fix-tz")
-def fix_tz():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            UPDATE sightings
-            SET hour = (hour + 2) % 24,
-                timestamp = datetime(timestamp, '+2 hours')
-            WHERE timestamp < '2026-05-24T12:00:00'
-        """)
-        n = conn.execute("SELECT changes()").fetchone()[0]
-    return jsonify({"fixed": n})
+@app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
+def delete_sighting(sighting_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM sightings WHERE id = ?", (sighting_id,))
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/stats")
