@@ -1264,7 +1264,7 @@ function updateMap(allFlights) {
 function toggleMap() {
     const wrap = document.getElementById('mapWrap');
     const btn  = document.getElementById('mapToggle');
-    const show = wrap.style.display === 'none';
+    const show = getComputedStyle(wrap).display === 'none';
     wrap.style.display = show ? 'block' : 'none';
     btn.classList.toggle('active', show);
     if (show) { initMap(); if (_map) _map.invalidateSize(); updateMap(currentFlights); }
