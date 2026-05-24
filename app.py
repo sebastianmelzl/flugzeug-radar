@@ -15,6 +15,7 @@ DEFAULT_LAT = 49.83580017089844
 DEFAULT_LON = 8.829106330871582
 SIGHTING_RADIUS_KM = 3.0
 POLL_INTERVAL_S = 10
+RAILWAY_URL = "https://flugzeug-radar-production.up.railway.app"
 
 _data_dir = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(_data_dir, "sightings.db")
@@ -208,6 +209,13 @@ def get_flights():
 
 @app.route("/api/stats")
 def get_stats():
+    # Locally: proxy to Railway so both views show the same 24/7 data
+    if IS_MACOS:
+        try:
+            resp = requests.get(f"{RAILWAY_URL}/api/stats", timeout=10)
+            return jsonify(resp.json())
+        except Exception:
+            pass  # Fall through to local DB if Railway unreachable
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
