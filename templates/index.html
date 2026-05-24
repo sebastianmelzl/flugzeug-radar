@@ -497,6 +497,8 @@ const AIRCRAFT = {
     C56X:'Cessna Citation Excel',C68A:'Cessna 680A',
     PC12:'Pilatus PC-12',
     F100:'Fokker 100',
+    GLID:'Segelflugzeug',
+    BALL:'Ballon',
 };
 
 function airlineName(iata, icao) {
@@ -843,10 +845,13 @@ function renderCompactCard(f) {
     </div>`;
 }
 
+const GLIDER_CODES = new Set(['GLID','BALL','ULAC','GYRO','PARA','HANG']);
+
 /* ── Render card ── */
 function renderCard(f, isNew) {
     const noRoute = !f.airline_iata && !f.airline_icao && !f.origin_airport_iata && !f.destination_airport_iata;
-    if (noRoute) return renderCompactCard(f);
+    const isGlider = GLIDER_CODES.has(f.aircraft_code);
+    if (noRoute || isGlider) return renderCompactCard(f);
 
     const status = approachStatus(f);
 
