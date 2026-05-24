@@ -1205,6 +1205,7 @@ function renderFlights(flights, source) {
 
         // Chime + announce when within 5km AND heading towards user
         flights.filter(f => {
+            if (isCompact(f)) return false;
             if (announcedOverhead.has(f.id)) return false;
             if (f.distance_km > 5) return false;
             const st = approachStatus(f);
@@ -1217,6 +1218,7 @@ function renderFlights(flights, source) {
 
         // Ding + kurze Ansage für Überflüge ≤2km die nicht direkt auf mich zukommen
         flights.filter(f => {
+            if (isCompact(f)) return false;
             if (announcedPassover.has(f.id)) return false;
             return f.distance_km <= 2;
         }).forEach(f => {
