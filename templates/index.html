@@ -336,7 +336,6 @@ const DEFAULT_LON = {{ default_lon }};
 let userLat = DEFAULT_LAT, userLon = DEFAULT_LON;
 let previousIds = new Set();
 let announcedOverhead = new Set();
-let loggedSightings = new Set();
 let currentFlights = [];
 let countdownVal = 10, countdownInterval;
 
@@ -930,18 +929,6 @@ async function loadFlights() {
         const newIds = new Set(flights.map(f => f.id));
         previousIds = newIds;
 
-        // Log sightings ≤ 3km (once per flight)
-        flights.filter(f => f.distance_km <= 3).forEach(f => {
-            if (!loggedSightings.has(f.id)) {
-                loggedSightings.add(f.id);
-                fetch('/api/log_sighting', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(f),
-                });
-            }
-        });
-
         // Announce flights newly entering the 3km overhead zone
         flights.filter(f => f.distance_km <= 3).forEach(f => {
             if (!announcedOverhead.has(f.id)) {
@@ -950,9 +937,8 @@ async function loadFlights() {
             }
         });
 
-        // Clean up sets for flights no longer in radius
+        // Clean up for flights no longer in radius
         for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
-        for (const id of loggedSightings)   { if (!newIds.has(id)) loggedSightings.delete(id); }
 
         document.getElementById('countNum').textContent = flights.length;
         const st = document.getElementById('sourceTag');
