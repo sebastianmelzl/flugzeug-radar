@@ -1146,21 +1146,31 @@ function toggleMap() {
 }
 
 /* ── WebSocket ── */
-const socket = io();
-
-socket.on('flights_update', data => {
-    const allFlights = data.flights || [];
+function applyFlightData(allFlights, source) {
     const radius = parseFloat(document.getElementById('radiusSelect').value);
     const flights = allFlights
         .filter(f => {
-            const dlat = f.latitude - userLat, dlon = f.longitude - userLon;
-            const dist = Math.sqrt(dlat*dlat + dlon*dlon) * 111;
-            f.distance_km = parseFloat(f.distance_km) || parseFloat(dist.toFixed(1));
+            f.distance_km = parseFloat(f.distance_km) || (() => {
+                const dlat = f.latitude - userLat, dlon = f.longitude - userLon;
+                return parseFloat((Math.sqrt(dlat*dlat + dlon*dlon) * 111).toFixed(1));
+            })();
             return f.distance_km <= radius;
         })
         .sort((a, b) => a.distance_km - b.distance_km);
-    renderFlights(flights, data.source);
+    renderFlights(flights, source);
     updateMap(allFlights);
+}
+
+// Initial load via REST so data shows immediately on page open
+fetch(`/api/flights?radius=150`)
+    .then(r => r.json())
+    .then(d => { if (d.flights?.length) applyFlightData(d.flights, d.source); })
+    .catch(() => {});
+
+const socket = io();
+
+socket.on('flights_update', data => {
+    applyFlightData(data.flights || [], data.source);
 });
 
 socket.on('connect', () => showToast('🔌 Verbunden', '#00d4aa'));
