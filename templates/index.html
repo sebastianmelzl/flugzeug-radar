@@ -109,6 +109,25 @@
         }
         .compact-stats span { white-space: nowrap; }
 
+        .card.military {
+            border-color: #4a7c3f;
+            border-width: 2px;
+            background: #0a1a0d;
+        }
+        .card.military:hover { border-color: #6db560; }
+        .card.military.new-flight { border-color: #a3d99b; animation: flashInMil .8s ease; }
+        @keyframes flashInMil { 0%{background:#4a7c3f22} 100%{background:#0a1a0d} }
+        .military-badge {
+            background: #2d5a27;
+            color: #a3d99b;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .card.military .side-bar { background: #4a7c3f; }
+
         .card.overhead {
             border-color: #f97316;
             border-width: 2px;
@@ -467,6 +486,11 @@ const AIRLINES = {
     CV:'Cargolux','5X':'UPS Airlines',FX:'FedEx Express',
     ES:'DHL Air UK',BCS:'European Air Charter',
     '3G':'Avior Airlines',NC:'National Airlines',
+    // Militär (ICAO)
+    RCH:'US Air Force (AMC)',SAM:'US Air Force (SAM)',GAF:'Luftwaffe',
+    RAF:'Royal Air Force',NAF:'Dutch Air Force',FAF:'French Air Force',
+    BAF:'Belgian Air Force',HAF:'Hellenic Air Force',NATO:'NATO',
+    SVF:'Swedish Air Force',RFF:'Finnish Air Force',POL:'Polish Air Force',
     // ICAO-Codes (Fallback für FR24-Daten ohne IATA)
     JAR:'Jaro International',
     DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian Airlines',
@@ -521,6 +545,17 @@ const AIRCRAFT = {
     F100:'Fokker 100',
     GLID:'Segelflugzeug',
     BALL:'Ballon',
+    // Militär
+    C17:'Boeing C-17 Globemaster III',C130:'Lockheed C-130 Hercules',
+    C5M:'Lockheed C-5M Galaxy',KC135:'Boeing KC-135 Stratotanker',
+    KC10:'McDonnell Douglas KC-10',KC46A:'Boeing KC-46 Pegasus',
+    B52H:'Boeing B-52 Stratofortress',B1B:'Rockwell B-1B Lancer',
+    B2A:'Northrop Grumman B-2 Spirit',
+    F16:'General Dynamics F-16',F15:'McDonnell Douglas F-15',
+    F18:'McDonnell Douglas F/A-18',F22:'Lockheed F-22 Raptor',
+    F35:'Lockheed F-35 Lightning II',A10:'Fairchild A-10',
+    P8:'Boeing P-8 Poseidon',E3TF:'Boeing E-3 Sentry (AWACS)',
+    RC135:'Boeing RC-135',C32:'Boeing C-32',C40:'Boeing C-40',
 };
 
 function airlineName(iata, icao) {
@@ -926,7 +961,25 @@ function renderCompactCard(f) {
 }
 
 const GLIDER_CODES = new Set(['GLID','BALL','ULAC','GYRO','PARA','HANG']);
-function isCompact(f) { return (!f.airline_iata && !f.airline_icao) || GLIDER_CODES.has(f.aircraft_code); }
+const MILITARY_ICAO = new Set([
+    'RCH','SAM','GAF','RAF','NAF','FAF','BAF','HAF','DAF','CAF','TAF','PAF',
+    'SVF','RFF','NATO','USAF','USCG','USN','USMC','RNZ','RAAF','IAF','FAB',
+    'GFA','CFC','LFA','HRZ','POL','CEF','ROU','CHB','RBS',
+]);
+const MILITARY_AC = new Set([
+    'C17','C130','C5M','C5','C17A','KC135','KC10','KC46A','KC46',
+    'B52','B52H','B1','B1B','B2','B2A','F16','F15','F18','F22','F35',
+    'A10','U2','E3','E3TF','P8','RC135','RC12','E8','E6','C21',
+    'C12','C20','C32','C37','C40','G5','GLF5','FA18',
+]);
+function isMilitary(f) {
+    return MILITARY_ICAO.has(f.airline_icao) || MILITARY_AC.has(f.aircraft_code);
+}
+function isCompact(f) {
+    if (isMilitary(f)) return false;
+    if (GLIDER_CODES.has(f.aircraft_code)) return true;
+    return !f.airline_iata && !f.airline_icao;
+}
 
 /* ── Render card ── */
 function renderCard(f, isNew) {
@@ -965,17 +1018,18 @@ function renderCard(f, isNew) {
 
     // Status pill color
 
+    const mil = isMilitary(f);
     return `
-    <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''}" id="card-${f.id}">
+    <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''} ${mil?'military':''}" id="card-${f.id}">
         ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
 
         <!-- Section 1: Identity -->
         <div class="sec sec-identity">
-            ${f.airline_iata ? `<div style="background:#fff;border-radius:8px;padding:4px 10px;display:inline-flex;align-items:center;margin-bottom:6px">
+            ${mil ? '<span class="military-badge">✦ MILITARY</span>' : (f.airline_iata ? `<div style="background:#fff;border-radius:8px;padding:4px 10px;display:inline-flex;align-items:center;margin-bottom:6px">
                 <img src="https://pics.avs.io/120/32/${f.airline_iata}.png" alt="${airline}"
                      style="height:24px;max-width:100px;object-fit:contain;display:block"
                      onerror="this.parentElement.style.display='none'">
-            </div>` : ''}
+            </div>` : '')}
             <div class="callsign">${f.callsign || f.id}</div>
             <div class="flight-num">${flightNum || '&nbsp;'}</div>
             <div class="id-row">
