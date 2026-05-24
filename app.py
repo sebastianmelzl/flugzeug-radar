@@ -209,6 +209,34 @@ def log_sighting():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/admin/import-sightings", methods=["POST"])
+def import_sightings():
+    token = request.headers.get("X-Import-Token", "")
+    if token != os.environ.get("IMPORT_TOKEN", ""):
+        return jsonify({"error": "unauthorized"}), 401
+    rows = request.json or []
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.executemany(
+                """INSERT OR IGNORE INTO sightings
+                   (timestamp, hour, weekday, date, flight_id, callsign,
+                    airline_iata, airline_icao, aircraft_code,
+                    origin_airport_iata, destination_airport_iata,
+                    distance_km, altitude_ft, ground_speed_kmh)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                [(r["timestamp"], r["hour"], r["weekday"], r["date"],
+                  r.get("flight_id",""), r.get("callsign",""),
+                  r.get("airline_iata",""), r.get("airline_icao",""),
+                  r.get("aircraft_code",""), r.get("origin_airport_iata",""),
+                  r.get("destination_airport_iata",""),
+                  r.get("distance_km",0), r.get("altitude_ft",0),
+                  r.get("ground_speed_kmh",0)) for r in rows],
+            )
+        return jsonify({"ok": True, "imported": len(rows)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/stats")
 def get_stats():
     try:
