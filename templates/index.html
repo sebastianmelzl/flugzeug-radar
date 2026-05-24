@@ -1197,15 +1197,16 @@ function initMap() {
 
 function planeIcon(color, heading, small) {
     const rot = heading || 0;
-    const sc  = small ? 0.7 : 1;
-    const sz  = Math.round(48 * sc);
+    const sc  = small ? 0.62 : 1;
+    const sz  = Math.round(44 * sc);
     const off = Math.round(sz / 2);
-    // viewBox centered on (0,0) → rotate() rotates around visual center, no drift
-    // Aircraft top-view: nose at top (0,-12). White dot = nose.
+    // Realistic top-view silhouette: swept wings, narrow fuselage, tail fins
+    // Nose at (0,-13)=top, tail at (0,13)=bottom. Rotate around center (0,0).
+    const body = 'M0,-13 L1.2,-4 L11,2 L9,5 L1.8,3.5 L2,9 L4,11 L0,13 L-4,11 L-2,9 L-1.8,3.5 L-9,5 L-11,2 L-1.2,-4 Z';
     const svg = '<svg width="' + sz + '" height="' + sz + '" viewBox="-15 -15 30 30" xmlns="http://www.w3.org/2000/svg">'
         + '<g transform="rotate(' + rot + ')">'
-        + '<path d="M0,-12 L1.5,-3 L9,2 L6,5 L2,3 L2,10 L0,11 L-2,10 L-2,3 L-6,5 L-9,2 L-1.5,-3 Z" fill="' + color + '" opacity="0.92"/>'
-        + '<circle cx="0" cy="-9" r="2.5" fill="white"/>'
+        + '<path d="' + body + '" fill="' + color + '" stroke="rgba(0,0,0,0.4)" stroke-width="0.7" stroke-linejoin="round"/>'
+        + '<ellipse cx="0" cy="-7.5" rx="0.85" ry="2" fill="rgba(255,255,255,0.22)"/>'
         + '</g>'
         + '</svg>';
     return L.divIcon({ html: svg, iconSize: [sz, sz], iconAnchor: [off, off], className: '' });
