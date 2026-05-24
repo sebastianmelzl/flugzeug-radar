@@ -1156,12 +1156,15 @@ function renderFlights(flights, source) {
         _firstRender = false;
         for (const id of dingedIds) { if (!newIds.has(id)) dingedIds.delete(id); }
 
-        // Full chime + announce when directly overhead
-        flights.filter(f => f.distance_km <= (isCompact(f) ? 1 : 3)).forEach(f => {
-            if (!announcedOverhead.has(f.id)) {
-                announcedOverhead.add(f.id);
-                announce(f);
-            }
+        // Chime + announce when within 5km AND heading towards user
+        flights.filter(f => {
+            if (announcedOverhead.has(f.id)) return false;
+            if (f.distance_km > 5) return false;
+            const st = approachStatus(f);
+            return st && st.label === 'Auf dich zu';
+        }).forEach(f => {
+            announcedOverhead.add(f.id);
+            announce(f);
         });
     }
     for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
