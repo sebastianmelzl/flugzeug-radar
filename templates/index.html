@@ -756,10 +756,19 @@ async function speak(text) {
     }
 }
 
+let _audioCtx = null;
+function getAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    return _audioCtx;
+}
+// Unlock AudioContext on first user interaction
+document.addEventListener('click', getAudioCtx, { once: true });
+
 function playChime() {
     return new Promise(resolve => {
         try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = getAudioCtx();
             const freqs = [740, 554]; // F#5 → C#5 — klassischer Flughafen-Zweiklang
             let t = ctx.currentTime + 0.05;
             freqs.forEach(freq => {
