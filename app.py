@@ -147,7 +147,13 @@ def fetch_flights(lat, lon, radius_km):
 
 def save_sighting(f):
     now = datetime.now(tz=TZ)
+    flight_id = f.get("id", "")
     with sqlite3.connect(DB_PATH) as conn:
+        if flight_id and conn.execute(
+            "SELECT 1 FROM sightings WHERE flight_id = ? AND date = ?",
+            (flight_id, now.strftime("%Y-%m-%d"))
+        ).fetchone():
+            return
         conn.execute(
             """INSERT INTO sightings
                (timestamp, hour, weekday, date, flight_id, callsign,
