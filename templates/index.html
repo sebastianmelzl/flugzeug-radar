@@ -849,9 +849,9 @@ const GLIDER_CODES = new Set(['GLID','BALL','ULAC','GYRO','PARA','HANG']);
 
 /* ── Render card ── */
 function renderCard(f, isNew) {
-    const noRoute = !f.airline_iata && !f.airline_icao && !f.origin_airport_iata && !f.destination_airport_iata;
+    const noAirline = !f.airline_iata && !f.airline_icao;
     const isGlider = GLIDER_CODES.has(f.aircraft_code);
-    if (noRoute || isGlider) return renderCompactCard(f);
+    if (noAirline || isGlider) return renderCompactCard(f);
 
     const status = approachStatus(f);
 
