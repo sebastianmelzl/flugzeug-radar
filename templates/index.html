@@ -1198,15 +1198,14 @@ function initMap() {
 function planeIcon(color, heading, small) {
     const rot = heading || 0;
     const sc  = small ? 0.7 : 1;
-    const sz  = Math.round(30 * sc);
+    const sz  = Math.round(48 * sc);
     const off = Math.round(sz / 2);
     // viewBox centered on (0,0) → rotate() rotates around visual center, no drift
-    // Aircraft top-view: nose at (0,-12), wings sweep back, tail at bottom
-    // White circle marks nose unambiguously
+    // Aircraft top-view: nose at top (0,-12). White dot = nose.
     const svg = '<svg width="' + sz + '" height="' + sz + '" viewBox="-15 -15 30 30" xmlns="http://www.w3.org/2000/svg">'
         + '<g transform="rotate(' + rot + ')">'
         + '<path d="M0,-12 L1.5,-3 L9,2 L6,5 L2,3 L2,10 L0,11 L-2,10 L-2,3 L-6,5 L-9,2 L-1.5,-3 Z" fill="' + color + '" opacity="0.92"/>'
-        + '<circle cx="0" cy="-10" r="2" fill="white" opacity="0.85"/>'
+        + '<circle cx="0" cy="-9" r="2.5" fill="white"/>'
         + '</g>'
         + '</svg>';
     return L.divIcon({ html: svg, iconSize: [sz, sz], iconAnchor: [off, off], className: '' });
