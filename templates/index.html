@@ -367,6 +367,54 @@
         /* FR24 link */
         .fr24-btn { background:none; border:none; color:#475569; font-size:12px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:all .15s; text-decoration:none; display:inline-flex; align-items:center; gap:3px; }
         .fr24-btn:hover { color:#00d4aa; background:#00d4aa11; }
+
+        /* ── Light Theme ── */
+        body.light { background:#f0f4f8; color:#0f172a; }
+        body.light header { background:#fff; border-bottom-color:#cbd5e1; }
+        body.light .logo { color:#0284c7; }
+        body.light select { background:#fff; border-color:#cbd5e1; color:#0f172a; }
+        body.light .map-btn { background:#f1f5f9; border-color:#cbd5e1; color:#374151; }
+        body.light .map-btn:hover, body.light .map-btn.active { border-color:#0284c7; color:#0284c7; }
+        body.light .meta { color:#64748b; }
+        body.light .meta b { color:#0284c7; }
+        body.light .flight-count { color:#374151; }
+        body.light .flight-count b { color:#0284c7; }
+        body.light .card { background:#fff; border-color:#cbd5e1; }
+        body.light .card:hover { border-color:#0284c744; }
+        body.light .card.new-flight { border-color:#0284c7; animation:flashInLight .8s ease; }
+        @keyframes flashInLight { 0%{background:#0284c718} 100%{background:#fff} }
+        body.light .card.military { background:#f0fdf4; border-color:#4a7c3f; }
+        body.light .card.military:hover { border-color:#6db560; }
+        body.light .card.military.new-flight { animation:flashInMil .8s ease; }
+        body.light .card.overhead { background:#fff7ed; }
+        body.light .sec { border-right-color:#e2e8f0; }
+        body.light .sec-label { color:#94a3b8; }
+        body.light .callsign { color:#0284c7; }
+        body.light .flight-num { color:#94a3b8; }
+        body.light .id-item-label { color:#94a3b8; }
+        body.light .id-item-value { color:#1e293b; }
+        body.light .ap-iata { color:#0f172a; }
+        body.light .ap-name { color:#334155; }
+        body.light .ap-city { color:#64748b; }
+        body.light .ap-time { color:#0284c7; }
+        body.light .ap-time-label { color:#94a3b8; }
+        body.light .route-plane { color:#cbd5e1; }
+        body.light .live-label { color:#94a3b8; }
+        body.light .live-value { color:#0f172a; }
+        body.light .live-unit, body.light .live-sub { color:#64748b; }
+        body.light .compact-callsign { color:#334155; }
+        body.light .compact-type, body.light .compact-stats { color:#94a3b8; }
+        body.light .sec-radar { background:#f1f5f9; }
+        body.light .radar-svg-wrap { background:#e2e8f0; border-color:#cbd5e1; }
+        body.light .speak-btn { background:#f1f5f9; border-color:#cbd5e1; color:#94a3b8; }
+        body.light .speak-btn:hover { background:#0284c711; border-color:#0284c7; color:#0284c7; }
+        body.light .state-msg { color:#94a3b8; }
+        body.light .state-msg .hint { color:#cbd5e1; }
+        body.light #mapWrap { border-bottom-color:#cbd5e1; }
+        body.light .leaflet-popup-content-wrapper { background:#fff; border-color:#cbd5e1; color:#0f172a; }
+        body.light .leaflet-popup-tip { background:#fff; }
+        body.light .fr24-btn { color:#94a3b8; }
+        body.light .fr24-btn:hover { color:#0284c7; background:#0284c711; }
     </style>
 </head>
 <body>
@@ -374,9 +422,10 @@
 <header>
     <div class="logo">✈ Flugzeug Radar</div>
     <div class="controls">
-        <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
+        <a href="/stats" class="map-btn" style="text-decoration:none">📊 Statistik</a>
         <button class="map-btn" id="mapToggle" onclick="toggleMap()">🗺 Karte</button>
         {% if is_local %}<button class="map-btn" id="spotifyBtn" onclick="toggleSpotify()" title="Spotify pausieren/fortsetzen">⏸ Spotify</button>{% endif %}
+        <button class="map-btn" id="themeToggle" onclick="toggleTheme()" title="Theme wechseln">☀️</button>
         <span class="meta"><span class="live-dot"></span>LIVE</span>
         <select id="radiusSelect">
             <option value="10" selected>10 km</option>
@@ -414,7 +463,7 @@ let announcedPassover = new Set();
 let _firstRender = true;
 let announcedOverhead = new Set();
 let currentFlights = [];
-let _map = null, _markers = {};
+let _map = null, _markers = {}, _tileLayer = null;
 
 /* ── Airline lookup (IATA + ICAO) ── */
 const AIRLINES = {
@@ -1247,13 +1296,16 @@ function renderFlights(flights, source) {
 }
 
 /* ── Leaflet map ── */
+function mapTileUrl() {
+    return document.body.classList.contains('light')
+        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+}
+
 function initMap() {
     if (_map) return;
     _map = L.map('map', { zoomControl: true }).setView([userLat, userLon], 10);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap © CARTO',
-        maxZoom: 18
-    }).addTo(_map);
+    _tileLayer = L.tileLayer(mapTileUrl(), { attribution: '© OpenStreetMap © CARTO', maxZoom: 18 }).addTo(_map);
     L.circleMarker([userLat, userLon], {
         radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
     }).addTo(_map).bindPopup('📍 Dein Standort');
@@ -1375,6 +1427,25 @@ if (navigator.geolocation) {
         () => {}
     );
 }
+
+/* ── Theme ── */
+function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = light ? '🌙' : '☀️';
+    if (_map && _tileLayer) {
+        _map.removeLayer(_tileLayer);
+        _tileLayer = L.tileLayer(mapTileUrl(), { attribution: '© OpenStreetMap © CARTO', maxZoom: 18 }).addTo(_map);
+    }
+}
+
+function toggleTheme() {
+    const light = !document.body.classList.contains('light');
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+    applyTheme(light);
+}
+
+applyTheme(localStorage.getItem('theme') === 'light');
 </script>
 </body>
 </html>
