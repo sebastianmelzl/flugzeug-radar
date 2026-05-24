@@ -815,18 +815,18 @@ async function speak(text) {
 }
 
 let _audioCtx = null;
-function getAudioCtx() {
+async function getAudioCtx() {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    if (_audioCtx.state === 'suspended') await _audioCtx.resume();
     return _audioCtx;
 }
 // Unlock AudioContext on first user interaction
-document.addEventListener('click', getAudioCtx, { once: true });
+document.addEventListener('click', () => getAudioCtx(), { once: true });
 
 function playChime() {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
         try {
-            const ctx = getAudioCtx();
+            const ctx = await getAudioCtx();
 
             // Master gain + soft compressor so it doesn't clip
             const comp = ctx.createDynamicsCompressor();
@@ -1020,6 +1020,7 @@ function renderCard(f, isNew) {
     // Status pill color
 
     const mil = isMilitary(f);
+    const speakBtn = IS_LOCAL ? '<button class="speak-btn" onclick="speakFlight(\'' + f.id + '\')" title="Vorlesen">🔊</button>' : '';
     return `
     <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''} ${mil?'military':''}" id="card-${f.id}">
         ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
@@ -1108,7 +1109,7 @@ function renderCard(f, isNew) {
         <div class="sec-radar">
             <div class="radar-svg-wrap">${radarSVG(f)}</div>
             ${approachHTML}
-            ${IS_LOCAL ? `<button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen">🔊</button>` : ''}
+            ${speakBtn}
             ${f.callsign ? `<a class="fr24-btn" href="https://www.flightradar24.com/${f.callsign.toLowerCase()}" target="_blank" title="Auf FlightRadar24 ansehen">FR24 ↗</a>` : ''}
         </div>
     </div>`;
