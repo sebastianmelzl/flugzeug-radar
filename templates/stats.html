@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugzeug Radar – Statistik</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #090d1a; color: #e2e8f0; min-height: 100vh; }
+
+        header {
+            background: #0d1528; border-bottom: 1px solid #1e3a5f;
+            padding: 13px 28px; display: flex; align-items: center;
+            justify-content: space-between; position: sticky; top: 0; z-index: 10;
+        }
+        .logo { font-size: 18px; font-weight: 800; color: #00d4aa; }
+        .back-btn {
+            background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+            padding: 7px 16px; border-radius: 8px; font-size: 13px;
+            cursor: pointer; text-decoration: none; display: inline-block;
+            transition: all .15s;
+        }
+        .back-btn:hover { border-color: #00d4aa; color: #00d4aa; }
+
+        main { padding: 24px 28px; max-width: 1400px; margin: 0 auto; }
+
+        .kpi-row { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+        .kpi {
+            background: #0d1528; border: 1px solid #1e3a5f; border-radius: 14px;
+            padding: 20px 28px; flex: 1; min-width: 160px;
+        }
+        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #475569; margin-bottom: 8px; }
+        .kpi-value { font-size: 40px; font-weight: 800; color: #00d4aa; line-height: 1; }
+        .kpi-sub { font-size: 12px; color: #475569; margin-top: 4px; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        @media (max-width: 900px) { .grid, .grid-3 { grid-template-columns: 1fr; } }
+
+        .card {
+            background: #0d1528; border: 1px solid #1e3a5f;
+            border-radius: 14px; padding: 22px 24px;
+        }
+        .card-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+            color: #475569; margin-bottom: 18px; font-weight: 600;
+        }
+
+        .chart-wrap { position: relative; height: 220px; }
+        .chart-wrap-tall { position: relative; height: 280px; }
+
+        /* Ranking list */
+        .rank-list { display: flex; flex-direction: column; gap: 10px; }
+        .rank-item {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .rank-num {
+            font-size: 11px; color: #334155; font-weight: 700;
+            width: 20px; flex-shrink: 0; text-align: right;
+        }
+        .rank-bar-wrap { flex: 1; background: #0f1c30; border-radius: 4px; height: 8px; overflow: hidden; }
+        .rank-bar { height: 100%; background: #00d4aa; border-radius: 4px; transition: width .6s ease; }
+        .rank-label { font-size: 13px; color: #94a3b8; min-width: 140px; flex-shrink: 0; }
+        .rank-count { font-size: 13px; font-weight: 700; color: #e2e8f0; width: 32px; text-align: right; flex-shrink: 0; }
+
+        /* Recent table */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #475569; padding: 0 12px 10px 0; font-weight: 600; white-space: nowrap; }
+        td { padding: 9px 12px 9px 0; border-top: 1px solid #1a2f4a; color: #94a3b8; white-space: nowrap; }
+        td:first-child, th:first-child { padding-left: 0; }
+        td.mono { font-family: 'Courier New', monospace; color: #00d4aa; font-size: 12px; }
+        tr:hover td { color: #e2e8f0; }
+
+        .empty { color: #334155; font-size: 14px; text-align: center; padding: 40px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">✈ Statistik</div>
+    <a href="/" class="back-btn">← Zurück zum Radar</a>
+</header>
+
+<main>
+    <div class="kpi-row">
+        <div class="kpi">
+            <div class="kpi-label">Überflüge gesamt</div>
+            <div class="kpi-value" id="kpiTotal">–</div>
+            <div class="kpi-sub">≤ 3 km Radius</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Heutige Überflüge</div>
+            <div class="kpi-value" id="kpiToday">–</div>
+            <div class="kpi-sub" id="kpiTodaySub"></div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Stärkste Stunde</div>
+            <div class="kpi-value" id="kpiPeakHour">–</div>
+            <div class="kpi-sub" id="kpiPeakSub"></div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Häufigstes Modell</div>
+            <div class="kpi-value" style="font-size:22px;padding-top:8px" id="kpiTopAc">–</div>
+            <div class="kpi-sub" id="kpiTopAcSub"></div>
+        </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 2fr 1fr;">
+        <div class="card">
+            <div class="card-title">Überflüge nach Uhrzeit (alle Tage)</div>
+            <div class="chart-wrap"><canvas id="hourChart"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-title">Überflüge nach Wochentag</div>
+            <div class="chart-wrap"><canvas id="weekdayChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+        <div class="card-title">Tagesverlauf (letzte 30 Tage)</div>
+        <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
+    </div>
+
+    <div class="grid-3">
+        <div class="card">
+            <div class="card-title">Top Flugzeugmodelle</div>
+            <div class="rank-list" id="rankAircraft"><div class="empty">Noch keine Daten</div></div>
+        </div>
+        <div class="card">
+            <div class="card-title">Top Airlines</div>
+            <div class="rank-list" id="rankAirlines"><div class="empty">Noch keine Daten</div></div>
+        </div>
+        <div class="card">
+            <div class="card-title">Top Routen</div>
+            <div class="rank-list" id="rankRoutes"><div class="empty">Noch keine Daten</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Letzte Sichtungen</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Zeit</th>
+                        <th>Callsign</th>
+                        <th>Airline</th>
+                        <th>Modell</th>
+                        <th>Von</th>
+                        <th>Nach</th>
+                        <th>Distanz</th>
+                        <th>Höhe</th>
+                        <th>Speed</th>
+                    </tr>
+                </thead>
+                <tbody id="recentTable"><tr><td colspan="9" class="empty">Noch keine Daten</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script>
+const AIRLINES = {
+    LH:'Lufthansa',LX:'Swiss',OS:'Austrian Airlines',EW:'Eurowings','4U':'Eurowings',
+    DE:'Condor','4Y':'Eurowings Discover',WK:'Edelweiss Air',EN:'Air Dolomiti',
+    FR:'Ryanair',U2:'easyJet',W6:'Wizz Air',VY:'Vueling',V7:'Volotea',
+    BA:'British Airways',EI:'Aer Lingus',LS:'Jet2',BY:'TUI Airways',
+    KL:'KLM',HV:'Transavia',SN:'Brussels Airlines',AF:'Air France',
+    SK:'SAS Scandinavian',AY:'Finnair',FI:'Icelandair',BT:'airBaltic',
+    TP:'TAP Air Portugal',TK:'Turkish Airlines',PC:'Pegasus Airlines',
+    XQ:'SunExpress',A3:'Aegean Airlines',EK:'Emirates',FZ:'flydubai',
+    EY:'Etihad Airways',QR:'Qatar Airways',SV:'Saudia',MS:'EgyptAir',
+    ET:'Ethiopian Airlines',SU:'Aeroflot',S7:'S7 Airlines',
+    SQ:'Singapore Airlines',MH:'Malaysia Airlines',CX:'Cathay Pacific',
+    CA:'Air China',MU:'China Eastern',CZ:'China Southern',
+    JL:'Japan Airlines',NH:'All Nippon Airways',KE:'Korean Air',
+    AA:'American Airlines',UA:'United Airlines',DL:'Delta Air Lines',
+    AC:'Air Canada',CV:'Cargolux','5X':'UPS Airlines',FX:'FedEx Express',
+    DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian Airlines',
+    CFG:'Condor',RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',
+    BAW:'British Airways',THY:'Turkish Airlines',UAE:'Emirates',
+    ETD:'Etihad Airways',QTR:'Qatar Airways',CLX:'Cargolux',
+};
+const AIRCRAFT = {
+    A20N:'A320neo',A21N:'A321neo',A19N:'A319neo',
+    A318:'A318',A319:'A319',A320:'A320',A321:'A321',
+    A332:'A330-200',A333:'A330-300',A359:'A350-900',A35K:'A350-1000',A388:'A380',
+    B734:'737-400',B735:'737-500',B737:'737-700',B738:'737-800',B739:'737-900',
+    B37M:'737 MAX 7',B38M:'737 MAX 8',B39M:'737 MAX 9',
+    B744:'747-400',B748:'747-8',B752:'757-200',B763:'767-300',
+    B772:'777-200',B773:'777-300',B77W:'777-300ER',
+    B788:'787-8',B789:'787-9',B78X:'787-10',
+    E170:'E170',E175:'E175',E190:'E190',E195:'E195',
+    CRJ2:'CRJ-200',CRJ7:'CRJ-700',CRJ9:'CRJ-900',
+    AT75:'ATR 72-500',AT76:'ATR 72-600',DH8D:'Q400',
+};
+
+function airlineName(iata, icao) {
+    return AIRLINES[iata] || AIRLINES[icao] || iata || icao || '–';
+}
+function aircraftName(code) {
+    return AIRCRAFT[code] || code || '–';
+}
+
+const CHART_DEFAULTS = {
+    color: '#94a3b8',
+    borderColor: '#1e3a5f',
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d1528', borderColor: '#1e3a5f', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8' } },
+    scales: {
+        x: { ticks: { color: '#475569', font: { size: 11 } }, grid: { color: '#0f1c30' } },
+        y: { ticks: { color: '#475569', font: { size: 11 } }, grid: { color: '#0f1c30' }, beginAtZero: true },
+    },
+};
+
+let hourChart, weekdayChart, dailyChart;
+
+function buildRankList(containerId, items, labelFn, maxCount) {
+    const el = document.getElementById(containerId);
+    if (!items.length) { el.innerHTML = '<div class="empty">Noch keine Daten</div>'; return; }
+    el.innerHTML = items.map((item, i) => {
+        const pct = maxCount ? Math.round(item.count / maxCount * 100) : 0;
+        return `<div class="rank-item">
+            <span class="rank-num">${i + 1}</span>
+            <span class="rank-label">${labelFn(item)}</span>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
+            <span class="rank-count">${item.count}</span>
+        </div>`;
+    }).join('');
+}
+
+function renderRecent(rows) {
+    const tbody = document.getElementById('recentTable');
+    if (!rows.length) return;
+    tbody.innerHTML = rows.map(r => {
+        const ts = new Date(r.timestamp);
+        const time = ts.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+                   + ' ' + ts.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        return `<tr>
+            <td>${time}</td>
+            <td class="mono">${r.callsign || '–'}</td>
+            <td>${airlineName(r.airline_iata, r.airline_icao)}</td>
+            <td>${aircraftName(r.aircraft_code)}</td>
+            <td>${r.origin_airport_iata || '–'}</td>
+            <td>${r.destination_airport_iata || '–'}</td>
+            <td>${r.distance_km ? r.distance_km.toFixed(1) + ' km' : '–'}</td>
+            <td>${r.altitude_ft ? Math.round(r.altitude_ft).toLocaleString('de') + ' ft' : '–'}</td>
+            <td>${r.ground_speed_kmh ? r.ground_speed_kmh + ' km/h' : '–'}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function loadStats() {
+    const resp = await fetch('/api/stats');
+    const d = await resp.json();
+    if (d.error) return;
+
+    // KPIs
+    document.getElementById('kpiTotal').textContent = d.total;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayEntry = d.daily.find(x => x.date === todayStr);
+    document.getElementById('kpiToday').textContent = todayEntry ? todayEntry.count : 0;
+
+    const peak = d.hourly.reduce((a, b) => b.count > a.count ? b : a, { hour: 0, count: 0 });
+    document.getElementById('kpiPeakHour').textContent = peak.count > 0 ? `${peak.hour}–${peak.hour + 1} Uhr` : '–';
+    document.getElementById('kpiPeakSub').textContent = peak.count > 0 ? `${peak.count} Überflüge` : '';
+
+    if (d.aircraft.length) {
+        const top = d.aircraft[0];
+        document.getElementById('kpiTopAc').textContent = aircraftName(top.aircraft_code);
+        document.getElementById('kpiTopAcSub').textContent = `${top.count}× gesichtet`;
+    }
+
+    // Hourly bar chart
+    const hourCtx = document.getElementById('hourChart').getContext('2d');
+    if (hourChart) hourChart.destroy();
+    hourChart = new Chart(hourCtx, {
+        type: 'bar',
+        data: {
+            labels: d.hourly.map(h => `${h.hour}:00`),
+            datasets: [{
+                data: d.hourly.map(h => h.count),
+                backgroundColor: d.hourly.map(h => h.count === peak.count && peak.count > 0 ? '#f97316' : '#00d4aa33'),
+                borderColor: d.hourly.map(h => h.count === peak.count && peak.count > 0 ? '#f97316' : '#00d4aa'),
+                borderWidth: 1, borderRadius: 4,
+            }],
+        },
+        options: { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins } },
+    });
+
+    // Weekday chart
+    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const wdCtx = document.getElementById('weekdayChart').getContext('2d');
+    if (weekdayChart) weekdayChart.destroy();
+    weekdayChart = new Chart(wdCtx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                data: d.weekdays.map(w => w.count),
+                backgroundColor: '#00d4aa33',
+                borderColor: '#00d4aa',
+                borderWidth: 1, borderRadius: 4,
+            }],
+        },
+        options: { ...CHART_DEFAULTS },
+    });
+
+    // Daily line chart
+    const dailyReversed = [...d.daily].reverse();
+    const dlCtx = document.getElementById('dailyChart').getContext('2d');
+    if (dailyChart) dailyChart.destroy();
+    dailyChart = new Chart(dlCtx, {
+        type: 'line',
+        data: {
+            labels: dailyReversed.map(x => {
+                const [y, m, day] = x.date.split('-');
+                return `${day}.${m}`;
+            }),
+            datasets: [{
+                data: dailyReversed.map(x => x.count),
+                borderColor: '#00d4aa',
+                backgroundColor: '#00d4aa15',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointBackgroundColor: '#00d4aa',
+            }],
+        },
+        options: { ...CHART_DEFAULTS },
+    });
+
+    // Rankings
+    const maxAc = d.aircraft[0]?.count || 1;
+    buildRankList('rankAircraft', d.aircraft, r => aircraftName(r.aircraft_code), maxAc);
+
+    const maxAl = d.airlines[0]?.count || 1;
+    buildRankList('rankAirlines', d.airlines, r => airlineName(r.airline_iata, r.airline_icao), maxAl);
+
+    const maxRt = d.routes[0]?.count || 1;
+    buildRankList('rankRoutes', d.routes, r => `${r.origin_airport_iata} → ${r.destination_airport_iata}`, maxRt);
+
+    renderRecent(d.recent);
+}
+
+loadStats();
+</script>
+</body>
+</html>

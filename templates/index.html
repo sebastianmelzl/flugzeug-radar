@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugzeug Radar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #090d1a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #0d1528;
+            border-bottom: 1px solid #1e3a5f;
+            padding: 13px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky; top: 0; z-index: 10;
+        }
+
+        .logo { font-size: 18px; font-weight: 800; color: #00d4aa; }
+
+        .controls { display: flex; align-items: center; gap: 16px; }
+        .meta { font-size: 13px; color: #475569; }
+        .meta b { color: #00d4aa; }
+
+        select {
+            background: #1e293b; border: 1px solid #334155;
+            color: #e2e8f0; padding: 7px 12px;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+        }
+
+        .pulse {
+            width: 9px; height: 9px; border-radius: 50%;
+            background: #00d4aa; animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+        main { padding: 20px 28px; }
+
+        .status-bar {
+            display: flex; align-items: baseline;
+            gap: 12px; margin-bottom: 18px;
+        }
+        .flight-count { font-size: 14px; color: #64748b; }
+        .flight-count b { font-size: 28px; color: #00d4aa; font-weight: 800; }
+        .source-tag {
+            font-size: 11px; font-weight: 700;
+            padding: 2px 8px; border-radius: 8px;
+            color: #f97316; border: 1px solid #f9731650;
+            background: #f9731610;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: #0d1528;
+            border: 1px solid #1e3a5f;
+            border-radius: 14px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: stretch;
+            overflow: hidden;
+            transition: border-color .2s;
+            position: relative;
+        }
+        .card:hover { border-color: #00d4aa44; }
+        .card.new-flight {
+            border-color: #00d4aa;
+            animation: flashIn .8s ease;
+        }
+        @keyframes flashIn { 0%{background:#00d4aa18} 100%{background:#0d1528} }
+
+        .card.overhead {
+            border-color: #f97316;
+            border-width: 2px;
+            background: #1a0e06;
+            box-shadow: 0 0 32px #f9731630, 0 0 0 1px #f9731644;
+            animation: overheadPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes overheadPulse {
+            0%,100% { box-shadow: 0 0 32px #f9731630, 0 0 0 1px #f9731444; }
+            50%      { box-shadow: 0 0 52px #f9731660, 0 0 0 2px #f97316aa; }
+        }
+
+        .overhead-tag {
+            position: absolute; top: 14px; right: 14px;
+            background: #f97316; color: #fff;
+            font-size: 11px; font-weight: 800;
+            padding: 4px 10px; border-radius: 6px;
+            letter-spacing: .04em;
+            animation: overheadPulse 1.5s ease-in-out infinite;
+            z-index: 2;
+        }
+
+        .new-tag {
+            position: absolute; top: 14px; right: 14px;
+            background: #ef4444; color: #fff;
+            font-size: 10px; font-weight: 700;
+            padding: 2px 7px; border-radius: 5px;
+            z-index: 2;
+        }
+
+        .speak-btn {
+            background: #1e293b; border: 1px solid #334155;
+            color: #64748b; font-size: 16px;
+            width: 36px; height: 36px; border-radius: 8px;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; transition: all .15s;
+            margin-top: 8px; width: 100%;
+        }
+        .speak-btn:hover { background: #00d4aa22; border-color: #00d4aa; color: #00d4aa; }
+        .speak-btn.speaking { background: #00d4aa22; border-color: #00d4aa; color: #00d4aa;
+            animation: pulse 1s infinite; }
+
+        /* Card sections */
+        .sec {
+            padding: 20px 24px;
+            border-right: 1px solid #1a2f4a;
+        }
+        .sec:last-child { border-right: none; }
+
+        .sec-label {
+            font-size: 9px; text-transform: uppercase;
+            letter-spacing: .1em; color: #334155;
+            margin-bottom: 12px; font-weight: 600;
+        }
+
+        /* Section 1: Identity */
+        .sec-identity {
+            width: 220px;
+            flex-shrink: 0;
+        }
+
+        .callsign {
+            font-size: 38px; font-weight: 800;
+            color: #00d4aa; font-family: 'Courier New', monospace;
+            letter-spacing: .03em; line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .flight-num {
+            font-size: 14px; color: #64748b;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 14px;
+        }
+
+        .id-row {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+
+        .id-item-label {
+            font-size: 9px; text-transform: uppercase;
+            letter-spacing: .08em; color: #334155; margin-bottom: 1px;
+        }
+
+        .id-item-value {
+            font-size: 14px; font-weight: 600; color: #94a3b8;
+        }
+
+        .id-item-value.loading {
+            color: #334155; font-style: italic; font-size: 12px;
+        }
+
+        /* Section 2: Route */
+        .sec-route {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .route-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .airport {
+            flex: 1; min-width: 0;
+        }
+
+        .airport.right { text-align: right; }
+
+        .ap-iata {
+            font-size: 48px; font-weight: 900;
+            color: #e2e8f0; letter-spacing: .04em; line-height: 1;
+        }
+
+        .ap-name {
+            font-size: 15px; font-weight: 600;
+            color: #94a3b8; margin-top: 4px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .ap-city {
+            font-size: 12px; color: #475569; margin-top: 2px;
+        }
+
+        .ap-time {
+            font-size: 18px; font-weight: 700;
+            color: #00d4aa; margin-top: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .ap-time-label {
+            font-size: 10px; color: #334155; margin-top: 1px;
+        }
+
+        .route-mid {
+            flex-shrink: 0;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .route-plane {
+            font-size: 28px;
+            color: #1e3a5f;
+        }
+
+        .status-pill {
+            font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        /* Section 3: Live stats */
+        .sec-live {
+            width: 260px;
+            flex-shrink: 0;
+        }
+
+        .live-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px 18px;
+        }
+
+        .live-label {
+            font-size: 9px; text-transform: uppercase;
+            letter-spacing: .08em; color: #334155; margin-bottom: 3px;
+        }
+
+        .live-value {
+            font-size: 22px; font-weight: 700;
+            color: #e2e8f0; line-height: 1;
+        }
+
+        .live-unit { font-size: 11px; color: #475569; font-weight: 400; }
+        .live-sub  { font-size: 11px; color: #475569; margin-top: 2px; }
+
+        .vs-up   { color: #22c55e; }
+        .vs-down { color: #f87171; }
+        .vs-level{ color: #475569; }
+
+        /* Section 4: Radar */
+        .sec-radar {
+            width: 150px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            background: #090d1a;
+        }
+
+        .radar-svg-wrap {
+            border: 1px solid #1e3a5f;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #060911;
+            width: 118px; height: 118px;
+        }
+
+        .approach-badge {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 700;
+            padding: 5px 10px; border-radius: 7px;
+            text-align: center; width: 100%;
+            justify-content: center;
+        }
+
+        .ap-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%; flex-shrink: 0;
+        }
+
+        /* Empty / loading states */
+        .state-msg {
+            text-align: center; padding: 80px 20px; color: #334155;
+        }
+        .state-msg .icon { font-size: 56px; margin-bottom: 14px; }
+        .state-msg .text { font-size: 20px; font-weight: 600; }
+        .state-msg .hint { font-size: 14px; margin-top: 8px; color: #1e3a5f; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">✈ Flugzeug Radar</div>
+    <div class="controls">
+        <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
+        <span class="meta">Aktualisierung in <b id="countdown">5</b>s</span>
+        <select id="radiusSelect">
+            <option value="10">10 km</option>
+            <option value="25">25 km</option>
+            <option value="50" selected>50 km</option>
+            <option value="100">100 km</option>
+            <option value="150">150 km</option>
+        </select>
+        <div class="pulse"></div>
+    </div>
+</header>
+
+<main>
+    <div class="status-bar">
+        <div class="flight-count"><b id="countNum">–</b> Flugzeuge im Radius</div>
+        <span class="source-tag" id="sourceTag" style="display:none"></span>
+    </div>
+    <div id="flightList">
+        <div class="state-msg"><div class="icon">📡</div><div class="text">Daten werden geladen…</div></div>
+    </div>
+</main>
+
+<script>
+const DEFAULT_LAT = {{ default_lat }};
+const DEFAULT_LON = {{ default_lon }};
+let userLat = DEFAULT_LAT, userLon = DEFAULT_LON;
+let previousIds = new Set();
+let announcedOverhead = new Set();
+let loggedSightings = new Set();
+let currentFlights = [];
+let countdownVal = 5, countdownInterval;
+
+/* ── Airline lookup (IATA + ICAO) ── */
+const AIRLINES = {
+    // Deutschland & DACH
+    LH:'Lufthansa',LX:'Swiss',OS:'Austrian Airlines',
+    EW:'Eurowings','4U':'Eurowings','4Y':'Eurowings Discover',DE:'Condor',
+    X3:'TUI fly Deutschland',WK:'Edelweiss Air',
+    EN:'Air Dolomiti',GM:'Germania',ST:'Germania',
+    // UK & Irland
+    BA:'British Airways',EI:'Aer Lingus',LS:'Jet2',BY:'TUI Airways',
+    BE:'Flybe',MT:'Ryanair Sun',FR:'Ryanair',U2:'easyJet',
+    DY:'Norwegian',D8:'Norwegian Air International',DI:'Norwegian Air UK',
+    // Niederlande & Belgien
+    KL:'KLM',HV:'Transavia',SN:'Brussels Airlines',TG:'TUI fly Belgium',
+    TO:'Transavia France',
+    // Frankreich
+    AF:'Air France',A5:'HOP!',BIE:'Blue Islands',
+    // Spanien & Portugal
+    IB:'Iberia',I2:'Iberia Express',VY:'Vueling',V7:'Volotea',
+    TP:'TAP Air Portugal',VLG:'Vueling',YW:'Air Nostrum',PM:'Canaryfly',
+    // Skandinavien & Baltikum
+    SK:'SAS Scandinavian',AY:'Finnair',FI:'Icelandair',WF:'Widerøe',
+    BT:'airBaltic',DK:'Sunclass Airlines',KC:'Air Astana',
+    // Osteuropa
+    LO:'LOT Polish Airlines',OK:'Czech Airlines',
+    OU:'Croatia Airlines',JU:'Air Serbia',
+    RO:'TAROM',FB:'Bulgaria Air',BV:'Blue Air',
+    LG:'Luxair',J2:'Azerbaijan Airlines',AHY:'AZAL',
+    // Türkei & Griechenland
+    TK:'Turkish Airlines',PC:'Pegasus Airlines',XQ:'SunExpress',
+    XG:'SunExpress Germany',FH:'Freebird Airlines',
+    OHY:'Onur Air',KK:'AtlasGlobal',
+    A3:'Aegean Airlines',OA:'Olympic Air',GQ:'Sky Express',
+    H2:'Sky Express',
+    // Naher Osten & Golfstaaten
+    EK:'Emirates',FZ:'flydubai',EY:'Etihad Airways',
+    QR:'Qatar Airways',GF:'Gulf Air',WY:'Oman Air',
+    SV:'Saudia',XY:'flynas',HZ:'Saudi Gulf Airlines',
+    RJ:'Royal Jordanian',ME:'Middle East Airlines',
+    GE:'Georgian Airways',
+    // Nordafrika
+    MS:'EgyptAir',TU:'Tunisair',AT:'Royal Air Maroc',
+    '8U':'Afriqiyah Airways',AH:'Air Algérie',TT:'Air Taneen',
+    // Subsahara-Afrika
+    ET:'Ethiopian Airlines',KQ:'Kenya Airways',
+    WT:'Swiftair',HC:'Air Senegal',
+    // Russland & GUS
+    SU:'Aeroflot',S7:'S7 Airlines',DP:'Pobeda',FV:'Rossiya Airlines',
+    UT:'UTair',N4:'Nordavia','6N':'Nordavia',
+    // Asien–Pazifik
+    SQ:'Singapore Airlines',MH:'Malaysia Airlines',
+    TG:'Thai Airways',FD:'Thai AirAsia',
+    GA:'Garuda Indonesia',VN:'Vietnam Airlines',PR:'Philippine Airlines',
+    CX:'Cathay Pacific',KA:'Cathay Dragon',
+    CA:'Air China',MU:'China Eastern',CZ:'China Southern',
+    CI:'China Airlines',BR:'EVA Air',OD:'Batik Air Malaysia',
+    JL:'Japan Airlines',NH:'All Nippon Airways',MM:'Peach Aviation',
+    KE:'Korean Air',OZ:'Asiana Airlines',BX:'Air Busan',
+    AI:'Air India',SG:'SpiceJet','6E':'IndiGo',IX:'Air India Express',
+    UK:'Vistara',G8:'Go First',MK:'Air Mauritius',
+    // Australien & NZ
+    QF:'Qantas',JQ:'Jetstar',VA:'Virgin Australia',NZ:'Air New Zealand',
+    // Nordamerika
+    AA:'American Airlines',UA:'United Airlines',DL:'Delta Air Lines',
+    WN:'Southwest Airlines',AS:'Alaska Airlines',B6:'JetBlue',
+    F9:'Frontier Airlines',NK:'Spirit Airlines',G4:'Allegiant Air',
+    AC:'Air Canada',WS:'WestJet',PD:'Porter Airlines',
+    // Latein- & Mittelamerika
+    AM:'Aeroméxico',CM:'Copa Airlines',AV:'Avianca',
+    G3:'GOL',LA:'LATAM Airlines',AR:'Aerolíneas Argentinas',
+    // Cargo
+    CV:'Cargolux','5X':'UPS Airlines',FX:'FedEx Express',
+    ES:'DHL Air UK',BCS:'European Air Charter',
+    '3G':'Avior Airlines',NC:'National Airlines',
+    // ICAO-Codes (Fallback für FR24-Daten ohne IATA)
+    DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian Airlines',
+    CFG:'Condor',TUI:'TUI fly',
+    RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',
+    BAW:'British Airways',EIN:'Aer Lingus',
+    KLM:'KLM',TRA:'Transavia',SHX:'Swiss International',
+    AFR:'Air France',IBE:'Iberia',TAP:'TAP Air Portugal',
+    SAS:'SAS Scandinavian',FIN:'Finnair',BTI:'airBaltic',
+    THY:'Turkish Airlines',PGT:'Pegasus Airlines',
+    UAE:'Emirates',ETD:'Etihad Airways',QTR:'Qatar Airways',
+    SVA:'Saudia',MEA:'Middle East Airlines',RJA:'Royal Jordanian',
+    MSR:'EgyptAir',RAM:'Royal Air Maroc',
+    ETH:'Ethiopian Airlines',KQA:'Kenya Airways',
+    AFL:'Aeroflot',SBI:'S7 Airlines',
+    CCA:'Air China',CES:'China Eastern',CSN:'China Southern',
+    JAL:'Japan Airlines',ANA:'All Nippon Airways',
+    KAL:'Korean Air',AAR:'Asiana Airlines',
+    QFA:'Qantas',ANZ:'Air New Zealand',
+    AAL:'American Airlines',UAL:'United Airlines',DAL:'Delta Air Lines',
+    SWA:'Southwest Airlines',ASA:'Alaska Airlines',
+    ACA:'Air Canada',
+    CLX:'Cargolux',UPS:'UPS Airlines',FDX:'FedEx Express',
+    DHX:'DHL Air UK',GEC:'Lufthansa Cargo',GTI:'Atlas Air',
+    BOX:'ASL Airlines Belgium',FPO:'ASL Airlines France',
+};
+
+/* ── Aircraft type lookup ── */
+const AIRCRAFT = {
+    A20N:'Airbus A320neo',A21N:'Airbus A321neo',A19N:'Airbus A319neo',
+    A318:'Airbus A318',A319:'Airbus A319',A320:'Airbus A320',A321:'Airbus A321',
+    A332:'Airbus A330-200',A333:'Airbus A330-300',
+    A342:'Airbus A340-200',A343:'Airbus A340-300',A345:'Airbus A340-500',A346:'Airbus A340-600',
+    A359:'Airbus A350-900',A35K:'Airbus A350-1000',
+    A388:'Airbus A380-800',
+    B734:'Boeing 737-400',B735:'Boeing 737-500',B736:'Boeing 737-600',
+    B737:'Boeing 737-700',B738:'Boeing 737-800',B739:'Boeing 737-900',
+    B37M:'Boeing 737 MAX 7',B38M:'Boeing 737 MAX 8',B39M:'Boeing 737 MAX 9',
+    B744:'Boeing 747-400',B748:'Boeing 747-8',
+    B752:'Boeing 757-200',B753:'Boeing 757-300',
+    B762:'Boeing 767-200',B763:'Boeing 767-300',B764:'Boeing 767-400',
+    B772:'Boeing 777-200',B773:'Boeing 777-300',B77L:'Boeing 777-200LR',B77W:'Boeing 777-300ER',
+    B788:'Boeing 787-8',B789:'Boeing 787-9',B78X:'Boeing 787-10',
+    E170:'Embraer 170',E175:'Embraer 175',E190:'Embraer 190',E195:'Embraer 195',
+    E290:'Embraer E190-E2',E295:'Embraer E195-E2',
+    CRJ2:'Canadair CRJ-200',CRJ7:'Canadair CRJ-700',CRJ9:'Canadair CRJ-900',
+    AT45:'ATR 42-500',AT75:'ATR 72-500',AT76:'ATR 72-600',
+    DH8D:'Bombardier Q400',
+    MD11:'McDonnell Douglas MD-11',
+    C56X:'Cessna Citation Excel',C68A:'Cessna 680A',
+    PC12:'Pilatus PC-12',
+    F100:'Fokker 100',
+};
+
+function airlineName(iata, icao) {
+    if (!iata && !icao) return '';
+    const name = AIRLINES[iata] || AIRLINES[icao];
+    if (name) return name;
+    // Show raw code only if we have no name, so at least something is displayed
+    const code = iata || icao || '';
+    return code ? `${code} (unbekannt)` : '';
+}
+
+function aircraftName(code) {
+    if (!code) return '';
+    return AIRCRAFT[code] || code;
+}
+
+/* ── Airport names ── */
+const AP = {
+    // Deutschland
+    FRA:'Frankfurt',MUC:'München',BER:'Berlin',DUS:'Düsseldorf',HAM:'Hamburg',
+    STR:'Stuttgart',CGN:'Köln',NUE:'Nürnberg',LEJ:'Leipzig',DRS:'Dresden',
+    HAJ:'Hannover',BRE:'Bremen',FMO:'Münster',ERF:'Erfurt',SCN:'Saarbrücken',
+    FKB:'Karlsruhe',PAD:'Paderborn',FDH:'Friedrichshafen',HHN:'Frankfurt Hahn',
+    NRN:'Weeze',DTM:'Dortmund',EAP:'Basel-Mülhausen',AGB:'Augsburg',
+    FMM:'Memmingen',QEF:'Frankfurt-Egelsbach',
+    ZQW:'Zweibrücken',RBM:'Straubing',FRZ:'Fritzlar',
+    // Österreich
+    VIE:'Wien',GRZ:'Graz',INN:'Innsbruck',SZG:'Salzburg',LNZ:'Linz',
+    KLU:'Klagenfurt',HOH:'Hohenems',
+    // Schweiz
+    ZRH:'Zürich',GVA:'Genf',BSL:'Basel',BRN:'Bern',LUG:'Lugano',SIR:'Sion',
+    // UK & Irland
+    LHR:'London Heathrow',LGW:'London Gatwick',STN:'London Stansted',
+    LTN:'London Luton',LCY:'London City',SEN:'London Southend',
+    MAN:'Manchester',BHX:'Birmingham',EDI:'Edinburgh',GLA:'Glasgow',
+    BRS:'Bristol',NCL:'Newcastle',LPL:'Liverpool',LBA:'Leeds',
+    ABZ:'Aberdeen',INV:'Inverness',BFS:'Belfast',EMA:'East Midlands',ORK:'Cork',DUB:'Dublin',
+    SNN:'Shannon',NOC:'Knock',KIR:'Kerry',
+    // Frankreich
+    CDG:'Paris',ORY:'Paris Orly',LYS:'Lyon',NCE:'Nizza',MRS:'Marseille',
+    TLS:'Toulouse',BOD:'Bordeaux',NTE:'Nantes',SXB:'Straßburg',MPL:'Montpellier',
+    LIL:'Lille',RNS:'Rennes',BIA:'Bastia',AJA:'Ajaccio',FSC:'Figari',
+    BIQ:'Biarritz',CFE:'Clermont-Ferrand',LYN:'Lyon Bron',ETZ:'Metz',
+    PGF:'Perpignan',MZM:'Metz-Nancy',RCO:'Rochefort',DNR:'Dinard',
+    // Niederlande & Belgien
+    AMS:'Amsterdam',EIN:'Eindhoven',RTM:'Rotterdam',MST:'Maastricht',
+    GRQ:'Groningen',ENS:'Enschede',
+    BRU:'Brüssel',CRL:'Charleroi',LGG:'Lüttich',OST:'Ostende',
+    // Spanien
+    MAD:'Madrid',BCN:'Barcelona',PMI:'Palma de Mallorca',AGP:'Málaga',
+    ALC:'Alicante',VLC:'Valencia',SVQ:'Sevilla',BIO:'Bilbao',SDR:'Santander',
+    TFS:'Teneriffa Süd',TFN:'Teneriffa Nord',LPA:'Las Palmas',
+    ACE:'Lanzarote',FUE:'Fuerteventura',IBZ:'Ibiza',MAH:'Menorca',
+    GRX:'Granada',MJV:'Murcia',REU:'Reus',ZAZ:'Zaragoza',VGO:'Vigo',
+    OVD:'Asturien',SCQ:'Santiago de Compostela',PMO:'Palermo',
+    XRY:'Jerez',LEI:'Almería',RGS:'Burgos',
+    // Portugal
+    LIS:'Lissabon',OPO:'Porto',FAO:'Faro',TER:'Terceira',
+    PDL:'Ponta Delgada',FNC:'Funchal',HOR:'Horta',PXO:'Porto Santo',
+    // Italien
+    FCO:'Rom',CIA:'Rom Ciampino',MXP:'Mailand',LIN:'Mailand Linate',
+    BGY:'Bergamo',VCE:'Venedig',NAP:'Neapel',BLQ:'Bologna',
+    FLR:'Florenz',CTA:'Catania',PMO:'Palermo',BRI:'Bari',
+    TRN:'Turin',PSA:'Pisa',AOI:'Ancona',SUF:'Lamezia Terme',
+    CAG:'Cagliari',OLB:'Olbia',AHO:'Alghero',BZO:'Bozen',
+    VRN:'Verona',TSF:'Treviso',GOA:'Genua',REG:'Reggio Calabria',
+    CIY:'Comiso',TPS:'Trapani',CRV:'Crotone',BDS:'Brindisi',
+    // Griechenland
+    ATH:'Athen',SKG:'Thessaloniki',HER:'Heraklion',RHO:'Rhodos',
+    CFU:'Korfu',CHQ:'Chania',KOS:'Kos',JMK:'Mykonos',JTR:'Santorini',
+    ZTH:'Zakynthos',KGS:'Kos',EFL:'Kefalonia',PVK:'Preveza',
+    AOK:'Karpathos',SMI:'Samos',MJT:'Mytilene',KVA:'Kavala',
+    JIK:'Ikaria',JSI:'Skiathos',SKU:'Skyros',LRS:'Leros',
+    // Türkei
+    IST:'Istanbul',SAW:'Istanbul Sabiha',AYT:'Antalya',ADB:'Izmir',
+    ESB:'Ankara',DLM:'Dalaman',BJV:'Bodrum',GZT:'Gaziantep',
+    TZX:'Trabzon',ADA:'Adana',KYA:'Konya',VAN:'Van',ERZ:'Erzurum',
+    MLX:'Malatya',ASR:'Kayseri',DIY:'Diyarbakır',GZP:'Alanya',
+    // Skandinavien
+    CPH:'Kopenhagen',ARN:'Stockholm',OSL:'Oslo',HEL:'Helsinki',
+    GOT:'Göteborg',BGO:'Bergen',TRD:'Trondheim',TOS:'Tromsø',
+    BOO:'Bodø',LYR:'Longyearbyen',SVG:'Stavanger',KRS:'Kristiansand',
+    HAU:'Haugesund',AAL:'Aalborg',BLL:'Billund',RNN:'Bornholm',
+    TMP:'Tampere',TKU:'Turku',OUL:'Oulu',RVN:'Rovaniemi',
+    KEF:'Reykjavik',AEY:'Akureyri',EGS:'Egilsstaðir',
+    // Polen
+    WAW:'Warschau',KRK:'Krakau',WRO:'Breslau',GDN:'Danzig',
+    KTW:'Katowice',POZ:'Posen',LCJ:'Łódź',RZE:'Rzeszów',
+    SZZ:'Stettin',BZG:'Bromberg',IEG:'Zielona Góra',
+    // Tschechien & Slowakei
+    PRG:'Prag',BRQ:'Brünn',OSR:'Ostrava',PED:'Pardubice',
+    BTS:'Bratislava',KSC:'Košice',
+    // Ungarn & Rumänien
+    BUD:'Budapest',DEB:'Debrecen',
+    OTP:'Bukarest',CLJ:'Cluj',TSR:'Timișoara',SBZ:'Sibiu',
+    IAS:'Iași',CND:'Constanța',BAY:'Baia Mare',SUJ:'Satu Mare',
+    // Kroatien, Serbien, Slowenien
+    ZAG:'Zagreb',SPU:'Split',DBV:'Dubrovnik',ZAD:'Zadar',
+    PUY:'Pula',BWK:'Brač',OSI:'Osijek',
+    BEG:'Belgrad',INI:'Niš',TGD:'Podgorica',
+    LJU:'Ljubljana',MBX:'Maribor',
+    // Bulgarien & Albanien
+    SOF:'Sofia',BOJ:'Burgas',VAR:'Varna',
+    TIA:'Tirana',
+    // Zypern & Malta
+    LCA:'Larnaka',PFO:'Paphos',
+    MLA:'Malta',
+    // Nordmazedonien & Kosovo
+    SKP:'Skopje',PRN:'Pristina',
+    // Russland & Ukraine
+    SVO:'Moskau',DME:'Moskau Domodedovo',VKO:'Moskau Vnukovo',
+    LED:'Sankt Petersburg',KZN:'Kasan',SVX:'Jekaterinburg',
+    OVB:'Nowosibirsk',IKT:'Irkutsk',VVO:'Wladiwostok',
+    KHV:'Chabarowsk',UFA:'Ufa',AER:'Sotschi',MRV:'Mineralnyje Wody',
+    KIV:'Chisinau',KBP:'Kiew',LWO:'Lwiw',ODS:'Odessa',
+    // Naher Osten
+    DXB:'Dubai',AUH:'Abu Dhabi',DWC:'Dubai Al Maktoum',
+    DOH:'Doha',KWI:'Kuwait',BAH:'Bahrain',MCT:'Muskat',
+    RUH:'Riad',JED:'Dschidda',DMM:'Dammam',MED:'Medina',
+    AMM:'Amman',BEY:'Beirut',TLV:'Tel Aviv',BGW:'Bagdad',
+    BSR:'Basra',IKA:'Teheran',MHD:'Maschhad',SYZ:'Schiras',
+    GYD:'Baku',EVN:'Jerewan',TBS:'Tiflis',
+    // Afrika
+    CAI:'Kairo',LXR:'Luxor',HRG:'Hurghada',SSH:'Sharm el-Sheikh',
+    ALY:'Alexandria',ASW:'Assuan',
+    CMN:'Casablanca',RAK:'Marrakesch',AGA:'Agadir',TNG:'Tanger',
+    OUD:'Oujda',FEZ:'Fès',RBA:'Rabat',
+    TUN:'Tunis',DJE:'Djerba',MIR:'Monastir',SFA:'Sfax',
+    ALG:'Algier',ORN:'Oran',AAE:'Annaba',
+    TRP:'Tripolis',BEN:'Benghazi',
+    CAI:'Kairo',
+    NBO:'Nairobi',MBA:'Mombasa',
+    DAR:'Daressalam',ZNZ:'Sansibar',JRO:'Kilimanjaro',
+    ADD:'Addis Abeba',BJM:'Bujumbura',KGL:'Kigali',EBB:'Kampala',
+    JNB:'Johannesburg',CPT:'Kapstadt',DUR:'Durban',PLZ:'Port Elizabeth',
+    LOS:'Lagos',ABV:'Abuja',PHC:'Port Harcourt',
+    ACC:'Accra',ABJ:'Abidjan',DKR:'Dakar',
+    ROB:'Monrovia',FNA:'Freetown',CKY:'Conakry',
+    HAH:'Moroni',RUN:'Réunion',TNR:'Antananarivo',MRU:'Mauritius',SEZ:'Seychellen',
+    // USA & Kanada
+    JFK:'New York',EWR:'Newark',LGA:'New York LaGuardia',
+    LAX:'Los Angeles',ORD:'Chicago',MDW:'Chicago Midway',
+    ATL:'Atlanta',DFW:'Dallas',IAH:'Houston',HOU:'Houston Hobby',
+    MIA:'Miami',FLL:'Fort Lauderdale',PBI:'West Palm Beach',
+    SFO:'San Francisco',SJC:'San Jose',OAK:'Oakland',
+    BOS:'Boston',SEA:'Seattle',DEN:'Denver',PHX:'Phoenix',
+    LAS:'Las Vegas',MCO:'Orlando',TPA:'Tampa',
+    IAD:'Washington Dulles',DCA:'Washington Reagan',BWI:'Baltimore',
+    DTW:'Detroit',MSP:'Minneapolis',STL:'St. Louis',MCI:'Kansas City',
+    CLT:'Charlotte',PHL:'Philadelphia',PIT:'Pittsburgh',
+    SLC:'Salt Lake City',PDX:'Portland',RNO:'Reno',
+    ANC:'Anchorage',HNL:'Honolulu',OGG:'Maui',KOA:'Kona',
+    YYZ:'Toronto',YUL:'Montréal',YVR:'Vancouver',YYC:'Calgary',
+    YEG:'Edmonton',YWG:'Winnipeg',YQB:'Québec',YHZ:'Halifax',
+    // Mexiko & Karibik
+    MEX:'Mexiko-Stadt',CUN:'Cancún',GDL:'Guadalajara',MTY:'Monterrey',
+    PVR:'Puerto Vallarta',SJD:'Los Cabos',HUX:'Huatulco',
+    HAV:'Havanna',VRA:'Varadero',HOG:'Holguín',
+    SDQ:'Santo Domingo',PUJ:'Punta Cana',
+    MBJ:'Montego Bay',KIN:'Kingston',
+    SJU:'San Juan',STT:'St. Thomas',
+    BGI:'Bridgetown',ANU:'Antigua',SXM:'Sint Maarten',
+    // Mittel- & Südamerika
+    BOG:'Bogotá',MDE:'Medellín',CLO:'Cali',CTG:'Cartagena',
+    LIM:'Lima',CUZ:'Cusco',
+    GRU:'São Paulo',GIG:'Rio de Janeiro',BSB:'Brasília',
+    SSA:'Salvador',FOR:'Fortaleza',REC:'Recife',
+    BEL:'Belém',MAO:'Manaus',
+    EZE:'Buenos Aires',AEP:'Buenos Aires Jorge Newbery',COR:'Córdoba',
+    SCL:'Santiago',PMC:'Puerto Montt',IQQ:'Iquique',
+    GYE:'Guayaquil',UIO:'Quito',
+    MVD:'Montevideo',ASU:'Asunción',LPB:'La Paz',VVI:'Santa Cruz',
+    CCS:'Caracas',
+    // Asien
+    PEK:'Peking',PKX:'Peking Daxing',PVG:'Shanghai',SHA:'Shanghai Hongqiao',
+    CAN:'Guangzhou',SZX:'Shenzhen',CTU:'Chengdu',KMG:'Kunming',
+    WUH:'Wuhan',XIY:'Xi\'an',HGH:'Hangzhou',NKG:'Nanjing',
+    CKG:'Chongqing',HRB:'Harbin',SYX:'Sanya',FOC:'Fuzhou',
+    HKG:'Hongkong',MFM:'Macau',TPE:'Taipeh',KHH:'Kaohsiung',
+    NRT:'Tokio Narita',HND:'Tokio Haneda',KIX:'Osaka',
+    NGO:'Nagoya',CTS:'Sapporo',FUK:'Fukuoka',OKA:'Okinawa',
+    ICN:'Seoul',GMP:'Seoul Gimpo',PUS:'Busan',CJU:'Jeju',
+    SIN:'Singapur',KUL:'Kuala Lumpur',PEN:'Penang',LGK:'Langkawi',
+    BKK:'Bangkok',HKT:'Phuket',CNX:'Chiang Mai',USM:'Koh Samui',
+    CGK:'Jakarta',DPS:'Bali',SUB:'Surabaya',UPG:'Makassar',
+    MNL:'Manila',CEB:'Cebu',DVO:'Davao',
+    HAN:'Hanoi',SGN:'Ho-Chi-Minh-Stadt',DAD:'Da Nang',
+    PNH:'Phnom Penh',REP:'Siem Reap',VTE:'Vientiane',RGN:'Yangon',
+    DEL:'Delhi',BOM:'Mumbai',BLR:'Bengaluru',MAA:'Chennai',
+    HYD:'Hyderabad',CCU:'Kalkutta',AMD:'Ahmedabad',
+    COK:'Kochi',GOI:'Goa',IXE:'Mangaluru',PNQ:'Pune',
+    ATQ:'Amritsar',JAI:'Jaipur',LKO:'Lucknow',VNS:'Varanasi',
+    DAC:'Dhaka',CMB:'Colombo',KTM:'Kathmandu',MLE:'Malé',
+    DYU:'Duschanbe',SKD:'Samarkand',TAS:'Taschkent',
+    ALA:'Almaty',NQZ:'Astana',FRU:'Bischkek',ASB:'Aschgabat',GYD:'Baku',
+    // Australien & Ozeanien
+    SYD:'Sydney',MEL:'Melbourne',BNE:'Brisbane',PER:'Perth',
+    ADL:'Adelaide',CBR:'Canberra',HBA:'Hobart',DRW:'Darwin',
+    CNS:'Cairns',OOL:'Gold Coast',MCY:'Sunshine Coast',
+    AKL:'Auckland',CHC:'Christchurch',WLG:'Wellington',
+    DUD:'Dunedin',ZQN:'Queenstown',
+    NAN:'Nadi',APW:'Apia',SUV:'Suva',PPT:'Tahiti',
+    // Weitere
+    NLV:'Mykolajiw',OZH:'Saporischschja',
+};
+
+function apName(iata) { return iata ? (AP[iata] || iata) : ''; }
+
+/* ── Sprachausgabe ── */
+function buildSpeechText(f) {
+    const al     = airlineName(f.airline_iata, f.airline_icao);
+    const ac     = (aircraftName(f.aircraft_code) || f.aircraft_code || '').replace(/-/g, ' ');
+    const origin = apName(f.origin_airport_iata);
+    const dest   = apName(f.destination_airport_iata);
+
+    let text = 'Überflug';
+    if (al) text += ` von ${al}`;
+    if (ac) text += `, ${ac}`;
+    if (origin && dest) text += `. Von ${origin} nach ${dest}.`;
+    else if (dest)      text += `. Nach ${dest}.`;
+    else                text += '.';
+    return text;
+}
+
+function showToast(msg, color) {
+    let t = document.getElementById('speakToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'speakToast';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;z-index:999;transition:opacity .5s';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.background = color;
+    t.style.color = '#fff';
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.style.opacity = '0', 3000);
+}
+
+async function speak(text) {
+    try {
+        const resp = await fetch('/api/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        if (resp.ok) {
+            showToast('🔊 macOS Siri Stimme', '#00d4aa');
+        } else {
+            showToast('⚠ API Fehler ' + resp.status, '#ef4444');
+        }
+    } catch(e) {
+        showToast('⚠ Fetch fehlgeschlagen: ' + e.message, '#ef4444');
+    }
+}
+
+function announce(f) {
+    speak(buildSpeechText(f));
+}
+
+function speakFlight(id) {
+    const f = currentFlights.find(f => f.id === id);
+    if (!f) return;
+    const btn = document.querySelector(`#card-${id} .speak-btn`);
+    if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 4000); }
+    speak(buildSpeechText(f));
+}
+
+/* ── Helpers ── */
+function headingLabel(h) {
+    if (h==null) return '';
+    return ['N','NO','O','SO','S','SW','W','NW'][Math.round(h/45)%8];
+}
+
+function fmtTime(ts) {
+    if (!ts) return null;
+    return new Date(ts*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+
+function approachStatus(f) {
+    if (f.heading==null) return null;
+    const dLon=(userLon-f.longitude)*Math.PI/180;
+    const φ1=f.latitude*Math.PI/180, φ2=userLat*Math.PI/180;
+    const bearing=(Math.atan2(
+        Math.sin(dLon)*Math.cos(φ2),
+        Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(dLon)
+    )*180/Math.PI+360)%360;
+    const diff=Math.abs(((f.heading-bearing)+180)%360-180);
+    if (diff<45)  return {label:'Auf dich zu', color:'#00d4aa', dot:'#00d4aa'};
+    if (diff>135) return {label:'Von dir weg', color:'#475569', dot:'#334155'};
+    return             {label:'Fliegt vorbei', color:'#f59e0b', dot:'#f59e0b'};
+}
+
+/* ── Radar SVG ── */
+function radarSVG(f) {
+    const radiusKm = parseFloat(document.getElementById('radiusSelect').value);
+    const cx=59, cy=59, maxR=50;
+    const dLon=(f.longitude-userLon)*Math.PI/180;
+    const φ1=userLat*Math.PI/180, φ2=f.latitude*Math.PI/180;
+    const yb=Math.sin(dLon)*Math.cos(φ2);
+    const xb=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(dLon);
+    const bearing=(Math.atan2(yb,xb)*180/Math.PI+360)%360;
+    const br=bearing*Math.PI/180;
+    const dist=Math.min(f.distance_km/radiusKm,.92);
+    const px=cx+Math.sin(br)*dist*maxR;
+    const py=cy-Math.cos(br)*dist*maxR;
+    const h=f.heading||0;
+    return `<svg width="118" height="118" viewBox="0 0 118 118" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${cx}" cy="${cy}" r="${maxR}" fill="none" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="${cx}" cy="${cy}" r="${maxR*.5}" fill="none" stroke="#111827" stroke-width="1"/>
+      <line x1="${cx}" y1="${cy-maxR}" x2="${cx}" y2="${cy+maxR}" stroke="#111827" stroke-width=".6"/>
+      <line x1="${cx-maxR}" y1="${cy}" x2="${cx+maxR}" y2="${cy}" stroke="#111827" stroke-width=".6"/>
+      <text x="${cx}" y="${cy-maxR-3}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">N</text>
+      <text x="${cx}" y="${cy+maxR+10}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">S</text>
+      <text x="${cx+maxR+7}" y="${cy+3}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">O</text>
+      <text x="${cx-maxR-7}" y="${cy+3}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">W</text>
+      <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#00d4aa" stroke-width=".8" stroke-dasharray="3,3" opacity=".4"/>
+      <circle cx="${cx}" cy="${cy}" r="4" fill="#00d4aa" opacity=".85"/>
+      <circle cx="${cx}" cy="${cy}" r="2" fill="#060911"/>
+      <g transform="translate(${px},${py}) rotate(${h})">
+        <rect x="-1.8" y="-7.5" width="3.6" height="15" rx="1.8" fill="#00d4aa"/>
+        <rect x="-7.5" y="-2" width="15" height="3.2" rx="1.5" fill="#00d4aa"/>
+        <rect x="-3.5" y="5" width="7" height="2.2" rx="1" fill="#00d4aa"/>
+      </g>
+    </svg>`;
+}
+
+/* ── Render card ── */
+function renderCard(f, isNew) {
+    const status = approachStatus(f);
+
+    // Identity
+    const airline    = airlineName(f.airline_iata, f.airline_icao);
+    const acModel    = aircraftName(f.aircraft_code);
+    const reg        = f.registration || '';
+    const flightNum  = f.flight_number || '';
+    const icao24     = f.icao24 || '';
+    const squawk     = f.squawk || '';
+
+    // Route / airports
+    const originIata     = f.origin_airport_iata      || '';
+    const destIata       = f.destination_airport_iata  || '';
+    const originFullName = apName(originIata);
+    const destFullName   = apName(destIata);
+
+    const flightStatus = '';
+
+    // Vertical speed
+    const vs = f.vertical_speed_fpm || 0;
+    let vsClass='vs-level', vsIcon='→', vsText='Level';
+    if (vs > 100)  { vsClass='vs-up';   vsIcon='▲'; vsText=`+${Math.round(vs).toLocaleString('de')} ft/min`; }
+    if (vs < -100) { vsClass='vs-down'; vsIcon='▼'; vsText=`${Math.round(vs).toLocaleString('de')} ft/min`; }
+
+    // Approach
+    const approachHTML = status ? `
+        <div class="approach-badge" style="background:${status.color}18;border:1px solid ${status.color}44;color:${status.color}">
+            <span class="ap-dot" style="background:${status.dot}"></span>
+            ${status.label}
+        </div>` : '';
+
+    // Status pill color
+
+    return `
+    <div class="card ${isNew?'new-flight':''} ${f.distance_km<=2?'overhead':''}" id="card-${f.id}">
+        ${f.distance_km<=2 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
+
+        <!-- Section 1: Identity -->
+        <div class="sec sec-identity">
+            <div class="callsign">${f.callsign || f.id}</div>
+            <div class="flight-num">${flightNum || '&nbsp;'}</div>
+            <div class="id-row">
+                <div>
+                    <div class="id-item-label">Airline</div>
+                    <div class="id-item-value">${airline || '–'}</div>
+                </div>
+                <div>
+                    <div class="id-item-label">Flugzeugtyp</div>
+                    <div class="id-item-value">${acModel || '–'}</div>
+                </div>
+                <div>
+                    <div class="id-item-label">Kennzeichen</div>
+                    <div class="id-item-value">${reg || '–'}</div>
+                </div>
+                ${icao24 ? `<div>
+                    <div class="id-item-label">ICAO 24-bit</div>
+                    <div class="id-item-value" style="font-family:monospace;font-size:13px">${icao24.toUpperCase()}</div>
+                </div>` : ''}
+                ${squawk ? `<div>
+                    <div class="id-item-label">Squawk</div>
+                    <div class="id-item-value" style="font-family:monospace">${squawk}</div>
+                </div>` : ''}
+            </div>
+        </div>
+
+        <!-- Section 2: Route -->
+        <div class="sec sec-route">
+            <div class="sec-label">Route</div>
+            <div class="route-wrap">
+                <div class="airport">
+                    <div class="ap-iata">${originIata || '?'}</div>
+                    <div class="ap-name">${originFullName}</div>
+                </div>
+                <div class="route-mid">
+                    <div class="route-plane">✈</div>
+                </div>
+                <div class="airport right">
+                    <div class="ap-iata">${destIata || '?'}</div>
+                    <div class="ap-name">${destFullName}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Live stats -->
+        <div class="sec sec-live">
+            <div class="sec-label">Echtzeit-Daten</div>
+            <div class="live-grid">
+                <div>
+                    <div class="live-label">Höhe</div>
+                    <div class="live-value">${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') : '–'} <span class="live-unit">ft</span></div>
+                    <div class="live-sub">${f.altitude_m ? Math.round(f.altitude_m).toLocaleString('de') + ' m' : ''}</div>
+                </div>
+                <div>
+                    <div class="live-label">Geschwindigkeit</div>
+                    <div class="live-value">${f.ground_speed_kmh || '–'} <span class="live-unit">km/h</span></div>
+                    <div class="live-sub">${f.ground_speed_kt || '–'} kt</div>
+                </div>
+                <div>
+                    <div class="live-label">Kurs</div>
+                    <div class="live-value">${Math.round(f.heading||0)}° <span class="live-unit">${headingLabel(f.heading)}</span></div>
+                </div>
+                <div>
+                    <div class="live-label">Entfernung</div>
+                    <div class="live-value">${f.distance_km} <span class="live-unit">km</span></div>
+                </div>
+                <div style="grid-column:1/-1">
+                    <div class="live-label">Steigrate</div>
+                    <div class="live-value ${vsClass}" style="font-size:16px">${vsIcon} ${vsText}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Radar + approach -->
+        <div class="sec-radar">
+            <div class="radar-svg-wrap">${radarSVG(f)}</div>
+            ${approachHTML}
+            <button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen">🔊</button>
+        </div>
+    </div>`;
+}
+
+
+/* ── Load flights ── */
+async function loadFlights() {
+    const r = document.getElementById('radiusSelect').value;
+    try {
+        const resp = await fetch(`/api/flights?lat=${userLat}&lon=${userLon}&radius=${r}`);
+        const data = await resp.json();
+        if (data.error) return;
+
+        const flights = data.flights || [];
+        currentFlights = flights;
+
+        const newIds = new Set(flights.map(f => f.id));
+        previousIds = newIds;
+
+        // Log sightings ≤ 3km (once per flight)
+        flights.filter(f => f.distance_km <= 3).forEach(f => {
+            if (!loggedSightings.has(f.id)) {
+                loggedSightings.add(f.id);
+                fetch('/api/log_sighting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(f),
+                });
+            }
+        });
+
+        // Announce flights newly entering the 2km overhead zone
+        flights.filter(f => f.distance_km <= 2).forEach(f => {
+            if (!announcedOverhead.has(f.id)) {
+                announcedOverhead.add(f.id);
+                announce(f);
+            }
+        });
+
+        // Clean up sets for flights no longer in radius
+        for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
+        for (const id of loggedSightings)   { if (!newIds.has(id)) loggedSightings.delete(id); }
+
+        document.getElementById('countNum').textContent = flights.length;
+        const st = document.getElementById('sourceTag');
+        if (data.source) { st.textContent = data.source==='fr24'?'FlightRadar24':'OpenSky'; st.style.display=''; }
+
+        const list = document.getElementById('flightList');
+        if (flights.length === 0) {
+            list.innerHTML = `<div class="state-msg">
+                <div class="icon">🔭</div>
+                <div class="text">Keine Flugzeuge im Radius</div>
+                <div class="hint">Versuche einen größeren Radius</div>
+            </div>`;
+            return;
+        }
+
+        list.innerHTML = flights.map(f => renderCard(f, false)).join('');
+
+    } catch(e) { showToast('⚠ JS: ' + e.message, '#ef4444'); console.error(e); }
+}
+
+/* ── Countdown ── */
+function startCountdown() {
+    clearInterval(countdownInterval);
+    countdownVal = 5;
+    document.getElementById('countdown').textContent = 5;
+    countdownInterval = setInterval(() => {
+        countdownVal--;
+        document.getElementById('countdown').textContent = countdownVal;
+        if (countdownVal <= 0) {
+            clearInterval(countdownInterval);
+            loadFlights().then(() => startCountdown());
+        }
+    }, 1000);
+}
+
+document.getElementById('radiusSelect').addEventListener('change', () => {
+    previousIds = new Set();
+    loadFlights().then(() => startCountdown());
+});
+
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+        pos => { userLat=pos.coords.latitude; userLon=pos.coords.longitude;
+                 loadFlights().then(()=>startCountdown()); },
+        ()   => { loadFlights().then(()=>startCountdown()); }
+    );
+} else {
+    loadFlights().then(()=>startCountdown());
+}
+</script>
+</body>
+</html>
