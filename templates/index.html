@@ -1198,12 +1198,16 @@ function initMap() {
 function planeIcon(color, heading, small) {
     const rot = heading || 0;
     const sc  = small ? 0.7 : 1;
-    const sz  = Math.round(28 * sc);
+    const sz  = Math.round(30 * sc);
     const off = Math.round(sz / 2);
-    // SVG viewBox centered on (0,0) → rotate(angle) rotates around center, no drift
-    // Shape points UP at rot=0 (north). M0,-11 = nose, L±7,9 = wingtips, L0,4 = tail notch
-    const svg = '<svg width="' + sz + '" height="' + sz + '" viewBox="-14 -14 28 28" xmlns="http://www.w3.org/2000/svg">'
-        + '<path d="M0,-11 L7,9 L0,4 L-7,9 Z" fill="' + color + '" opacity="0.95" transform="rotate(' + rot + ')"/>'
+    // viewBox centered on (0,0) → rotate() rotates around visual center, no drift
+    // Aircraft top-view: nose at (0,-12), wings sweep back, tail at bottom
+    // White circle marks nose unambiguously
+    const svg = '<svg width="' + sz + '" height="' + sz + '" viewBox="-15 -15 30 30" xmlns="http://www.w3.org/2000/svg">'
+        + '<g transform="rotate(' + rot + ')">'
+        + '<path d="M0,-12 L1.5,-3 L9,2 L6,5 L2,3 L2,10 L0,11 L-2,10 L-2,3 L-6,5 L-9,2 L-1.5,-3 Z" fill="' + color + '" opacity="0.92"/>'
+        + '<circle cx="0" cy="-10" r="2" fill="white" opacity="0.85"/>'
+        + '</g>'
         + '</svg>';
     return L.divIcon({ html: svg, iconSize: [sz, sz], iconAnchor: [off, off], className: '' });
 }
