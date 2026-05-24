@@ -410,6 +410,7 @@ const IS_LOCAL = {{ 'true' if is_local else 'false' }};
 let userLat = DEFAULT_LAT, userLon = DEFAULT_LON;
 let previousIds = new Set();
 let dingedIds = new Set();
+let announcedPassover = new Set();
 let _firstRender = true;
 let announcedOverhead = new Set();
 let currentFlights = [];
@@ -921,6 +922,22 @@ async function announce(f) {
     speak(buildSpeechText(f));
 }
 
+function buildPassoverText(f) {
+    const al = airlineName(f.airline_iata, f.airline_icao);
+    const ac = (aircraftName(f.aircraft_code) || f.aircraft_code || '').replace(/-/g, ' ');
+    let text = 'Schau nach oben';
+    if (al) text += `, ${al}`;
+    if (ac) text += `, ${ac}`;
+    text += ' ist gerade über dir.';
+    return text;
+}
+
+async function announcePassover(f) {
+    await spotifyPause();
+    await playDing();
+    speak(buildPassoverText(f));
+}
+
 async function speakFlight(id) {
     const f = currentFlights.find(f => f.id === id);
     if (!f) return;
@@ -1194,10 +1211,21 @@ function renderFlights(flights, source) {
             return st && st.label === 'Auf dich zu';
         }).forEach(f => {
             announcedOverhead.add(f.id);
+            announcedPassover.add(f.id); // nicht doppelt ansagen
             announce(f);
         });
+
+        // Ding + kurze Ansage für Überflüge ≤2km die nicht direkt auf mich zukommen
+        flights.filter(f => {
+            if (announcedPassover.has(f.id)) return false;
+            return f.distance_km <= 2;
+        }).forEach(f => {
+            announcedPassover.add(f.id);
+            announcePassover(f);
+        });
     }
-    for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
+    for (const id of announcedOverhead)  { if (!newIds.has(id)) announcedOverhead.delete(id); }
+    for (const id of announcedPassover)  { if (!newIds.has(id)) announcedPassover.delete(id); }
 
     document.getElementById('countNum').textContent = flights.length;
     const st = document.getElementById('sourceTag');
