@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flugzeug Radar</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -332,6 +333,21 @@
         .state-msg .icon { font-size: 56px; margin-bottom: 14px; }
         .state-msg .text { font-size: 20px; font-weight: 600; }
         .state-msg .hint { font-size: 14px; margin-top: 8px; color: #1e3a5f; }
+
+        /* Map */
+        #mapWrap { height: 360px; border-bottom: 1px solid #1e3a5f; display: none; }
+        #map { height: 100%; }
+        .flight-marker { font-size: 18px; line-height: 1; filter: drop-shadow(0 0 3px #000c); cursor: pointer; }
+        .leaflet-popup-content-wrapper { background: #0d1528; border: 1px solid #1e3a5f; color: #e2e8f0; border-radius: 10px; }
+        .leaflet-popup-tip { background: #0d1528; }
+        .map-btn { background:#1e293b; border:1px solid #334155; color:#94a3b8; padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer; transition:all .15s; }
+        .map-btn:hover, .map-btn.active { border-color:#00d4aa; color:#00d4aa; }
+        .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#00d4aa; margin-right:4px; animation: livePulse 1.2s ease-in-out infinite; }
+        @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+        /* FR24 link */
+        .fr24-btn { background:none; border:none; color:#475569; font-size:12px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:all .15s; text-decoration:none; display:inline-flex; align-items:center; gap:3px; }
+        .fr24-btn:hover { color:#00d4aa; background:#00d4aa11; }
     </style>
 </head>
 <body>
@@ -340,7 +356,8 @@
     <div class="logo">✈ Flugzeug Radar</div>
     <div class="controls">
         <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
-        <span class="meta">Aktualisierung in <b id="countdown">10</b>s</span>
+        <button class="map-btn" id="mapToggle" onclick="toggleMap()">🗺 Karte</button>
+        <span class="meta"><span class="live-dot"></span>LIVE</span>
         <select id="radiusSelect">
             <option value="10" selected>10 km</option>
             <option value="25">25 km</option>
@@ -352,6 +369,8 @@
     </div>
 </header>
 
+<div id="mapWrap"><div id="map"></div></div>
+
 <main>
     <div class="status-bar">
         <div class="flight-count"><b id="countNum">–</b> Flugzeuge im Radius</div>
@@ -362,6 +381,8 @@
     </div>
 </main>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 <script>
 const DEFAULT_LAT = {{ default_lat }};
 const DEFAULT_LON = {{ default_lon }};
@@ -369,7 +390,7 @@ let userLat = DEFAULT_LAT, userLon = DEFAULT_LON;
 let previousIds = new Set();
 let announcedOverhead = new Set();
 let currentFlights = [];
-let countdownVal = 10, countdownInterval;
+let _map = null, _markers = {};
 
 /* ── Airline lookup (IATA + ICAO) ── */
 const AIRLINES = {
@@ -1032,85 +1053,131 @@ function renderCard(f, isNew) {
             <div class="radar-svg-wrap">${radarSVG(f)}</div>
             ${approachHTML}
             <button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen">🔊</button>
+            ${f.callsign ? `<a class="fr24-btn" href="https://www.flightradar24.com/${f.callsign.toLowerCase()}" target="_blank" title="Auf FlightRadar24 ansehen">FR24 ↗</a>` : ''}
         </div>
     </div>`;
 }
 
 
-/* ── Load flights ── */
-async function loadFlights() {
-    const r = document.getElementById('radiusSelect').value;
-    try {
-        const resp = await fetch(`/api/flights?lat=${userLat}&lon=${userLon}&radius=${r}`);
-        const data = await resp.json();
-        if (data.error) return;
+/* ── Render flights from data ── */
+function renderFlights(flights, source) {
+    const newIds = new Set(flights.map(f => f.id));
+    previousIds = newIds;
+    currentFlights = flights;
 
-        const flights = data.flights || [];
-        currentFlights = flights;
+    flights.filter(f => f.distance_km <= (isCompact(f) ? 1 : 3)).forEach(f => {
+        if (!announcedOverhead.has(f.id)) {
+            announcedOverhead.add(f.id);
+            announce(f);
+        }
+    });
+    for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
 
-        const newIds = new Set(flights.map(f => f.id));
-        previousIds = newIds;
+    document.getElementById('countNum').textContent = flights.length;
+    const st = document.getElementById('sourceTag');
+    if (source) { st.textContent = source==='fr24'?'FlightRadar24':'OpenSky'; st.style.display=''; }
 
-        // Announce flights newly entering the overhead zone (1km for GA/gliders, 3km for airliners)
-        flights.filter(f => f.distance_km <= (isCompact(f) ? 1 : 3)).forEach(f => {
-            if (!announcedOverhead.has(f.id)) {
-                announcedOverhead.add(f.id);
-                announce(f);
-            }
+    const list = document.getElementById('flightList');
+    if (flights.length === 0) {
+        list.innerHTML = `<div class="state-msg"><div class="icon">🔭</div>
+            <div class="text">Keine Flugzeuge im Radius</div>
+            <div class="hint">Versuche einen größeren Radius</div></div>`;
+        return;
+    }
+    const main = flights.filter(f => !isCompact(f));
+    const comp = flights.filter(f =>  isCompact(f));
+    list.innerHTML = [...main, ...comp].map(f => renderCard(f, false)).join('');
+}
+
+/* ── Leaflet map ── */
+function initMap() {
+    if (_map) return;
+    _map = L.map('map', { zoomControl: true }).setView([userLat, userLon], 10);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 18
+    }).addTo(_map);
+    L.circleMarker([userLat, userLon], {
+        radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
+    }).addTo(_map).bindPopup('📍 Dein Standort');
+}
+
+function updateMap(allFlights) {
+    if (!_map) return;
+    const radius = parseFloat(document.getElementById('radiusSelect').value);
+    const seen = new Set();
+
+    allFlights.forEach(f => {
+        seen.add(f.id);
+        const inRadius = f.distance_km <= radius;
+        const overhead = f.distance_km <= (isCompact(f) ? 1 : 3);
+        const color = overhead ? '#f97316' : inRadius ? '#00d4aa' : '#475569';
+        const size  = isCompact(f) ? 14 : 20;
+        const icon  = L.divIcon({
+            html: `<div class="flight-marker" style="color:${color};font-size:${size}px;transform:rotate(${f.heading||0}deg)">✈</div>`,
+            iconSize: [size, size], iconAnchor: [size/2, size/2], className: ''
         });
+        const popup = `<b>${f.callsign||f.id}</b><br>${f.airline_iata||f.airline_icao||'–'} · ${f.aircraft_code||'–'}<br>${f.origin_airport_iata||'?'} → ${f.destination_airport_iata||'?'}<br>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de')+' ft' : '–'} · ${f.distance_km} km`;
 
-        // Clean up for flights no longer in radius
-        for (const id of announcedOverhead) { if (!newIds.has(id)) announcedOverhead.delete(id); }
-
-        document.getElementById('countNum').textContent = flights.length;
-        const st = document.getElementById('sourceTag');
-        if (data.source) { st.textContent = data.source==='fr24'?'FlightRadar24':'OpenSky'; st.style.display=''; }
-
-        const list = document.getElementById('flightList');
-        if (flights.length === 0) {
-            list.innerHTML = `<div class="state-msg">
-                <div class="icon">🔭</div>
-                <div class="text">Keine Flugzeuge im Radius</div>
-                <div class="hint">Versuche einen größeren Radius</div>
-            </div>`;
-            return;
+        if (_markers[f.id]) {
+            _markers[f.id].setLatLng([f.latitude, f.longitude]).setIcon(icon).setPopupContent(popup);
+        } else {
+            _markers[f.id] = L.marker([f.latitude, f.longitude], { icon })
+                .addTo(_map).bindPopup(popup)
+                .on('click', () => {
+                    const card = document.getElementById(`card-${f.id}`);
+                    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
         }
+    });
 
-        const main    = flights.filter(f => !isCompact(f));
-        const compact = flights.filter(f =>  isCompact(f));
-        list.innerHTML = [...main, ...compact].map(f => renderCard(f, false)).join('');
-
-    } catch(e) { showToast('⚠ JS: ' + e.message, '#ef4444'); console.error(e); }
+    Object.keys(_markers).forEach(id => {
+        if (!seen.has(id)) { _map.removeLayer(_markers[id]); delete _markers[id]; }
+    });
 }
 
-/* ── Countdown ── */
-function startCountdown() {
-    clearInterval(countdownInterval);
-    countdownVal = 10;
-    document.getElementById('countdown').textContent = 10;
-    countdownInterval = setInterval(() => {
-        countdownVal--;
-        document.getElementById('countdown').textContent = countdownVal;
-        if (countdownVal <= 0) {
-            clearInterval(countdownInterval);
-            loadFlights().then(() => startCountdown());
-        }
-    }, 1000);
+function toggleMap() {
+    const wrap = document.getElementById('mapWrap');
+    const btn  = document.getElementById('mapToggle');
+    const show = wrap.style.display === 'none';
+    wrap.style.display = show ? 'block' : 'none';
+    btn.classList.toggle('active', show);
+    if (show) { initMap(); if (_map) _map.invalidateSize(); updateMap(currentFlights); }
 }
+
+/* ── WebSocket ── */
+const socket = io();
+
+socket.on('flights_update', data => {
+    const allFlights = data.flights || [];
+    const radius = parseFloat(document.getElementById('radiusSelect').value);
+    const flights = allFlights
+        .filter(f => {
+            const dlat = f.latitude - userLat, dlon = f.longitude - userLon;
+            const dist = Math.sqrt(dlat*dlat + dlon*dlon) * 111;
+            f.distance_km = parseFloat(f.distance_km) || parseFloat(dist.toFixed(1));
+            return f.distance_km <= radius;
+        })
+        .sort((a, b) => a.distance_km - b.distance_km);
+    renderFlights(flights, data.source);
+    updateMap(allFlights);
+});
+
+socket.on('connect', () => showToast('🔌 Verbunden', '#00d4aa'));
+socket.on('disconnect', () => showToast('⚠ Verbindung getrennt', '#ef4444'));
 
 document.getElementById('radiusSelect').addEventListener('change', () => {
     previousIds = new Set();
-    loadFlights().then(() => startCountdown());
+    renderFlights(currentFlights.filter(f =>
+        f.distance_km <= parseFloat(document.getElementById('radiusSelect').value)
+    ).sort((a,b) => a.distance_km - b.distance_km), null);
 });
 
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-        pos => { userLat=pos.coords.latitude; userLon=pos.coords.longitude;
-                 loadFlights().then(()=>startCountdown()); },
-        ()   => { loadFlights().then(()=>startCountdown()); }
+        pos => { userLat = pos.coords.latitude; userLon = pos.coords.longitude; },
+        () => {}
     );
-} else {
-    loadFlights().then(()=>startCountdown());
 }
 </script>
 </body>

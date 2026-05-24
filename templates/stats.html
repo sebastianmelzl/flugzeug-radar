@@ -130,6 +130,18 @@
         <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
     </div>
 
+    <div class="card" style="margin-bottom:20px">
+        <div class="card-title">Heatmap: Wochentag × Uhrzeit</div>
+        <div id="heatmapWrap" style="overflow-x:auto;padding-top:8px">
+            <div id="heatmap" style="display:inline-grid;grid-template-columns:48px repeat(24,1fr);gap:2px;min-width:700px;width:100%"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:#888">
+                <span>0</span>
+                <div style="height:12px;width:120px;border-radius:4px;background:linear-gradient(to right,#0f1117,#00d4aa)"></div>
+                <span>Max</span>
+            </div>
+        </div>
+    </div>
+
     <div class="grid-3">
         <div class="card">
             <div class="card-title">Top Flugzeugmodelle</div>
@@ -287,6 +299,35 @@ async function deleteSighting(id) {
     }
 }
 
+function renderHeatmap(heatmap) {
+    const grid = document.getElementById('heatmap');
+    const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const maxVal = Math.max(1, ...Object.values(heatmap));
+    let html = '';
+    // Header row: empty corner + hour labels
+    html += '<div style="font-size:10px;color:#475569"></div>';
+    for (let h = 0; h < 24; h++) {
+        html += `<div style="font-size:9px;color:#475569;text-align:center;padding-bottom:2px">${h}</div>`;
+    }
+    // Data rows
+    for (let d = 0; d < 7; d++) {
+        html += `<div style="font-size:11px;color:#94a3b8;display:flex;align-items:center;padding-right:4px;white-space:nowrap">${days[d]}</div>`;
+        for (let h = 0; h < 24; h++) {
+            const count = heatmap[`${d},${h}`] || 0;
+            const intensity = count / maxVal;
+            const alpha = count === 0 ? 0.05 : 0.15 + intensity * 0.85;
+            const r = Math.round(0 + intensity * 0);
+            const g = Math.round(212 * intensity);
+            const b = Math.round(170 * intensity);
+            const bg = count === 0 ? 'rgba(255,255,255,0.04)' : `rgba(0,${Math.round(80 + intensity * 132)},${Math.round(intensity * 170)},${alpha.toFixed(2)})`;
+            html += `<div title="${days[d]} ${h}:00 – ${count} Überflug${count !== 1 ? 'e' : ''}"
+                style="background:${bg};border-radius:3px;aspect-ratio:1;min-height:14px;cursor:default;transition:opacity .15s"
+                onmouseover="this.style.outline='1px solid #00d4aa'" onmouseout="this.style.outline=''"></div>`;
+        }
+    }
+    grid.innerHTML = html;
+}
+
 async function loadStats() {
     const resp = await fetch('/api/stats');
     const d = await resp.json();
@@ -367,6 +408,9 @@ async function loadStats() {
         },
         options: { ...CHART_DEFAULTS },
     });
+
+    // Heatmap
+    renderHeatmap(d.heatmap || {});
 
     // Rankings
     const maxAc = d.aircraft[0]?.count || 1;

@@ -3,3 +3,5 @@ gunicorn
 FlightRadarAPI
 requests
 edge-tts
+flask-socketio
+eventlet

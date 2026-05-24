@@ -1,18 +1,21 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO
 import requests
 import math
 import subprocess
 import sqlite3
 import os
 import sys
-import threading
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Berlin")
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 DEFAULT_LAT = 49.83580017089844
 DEFAULT_LON = 8.829106330871582
@@ -60,7 +63,6 @@ def haversine(lat1, lon1, lat2, lon2):
 
 
 def fetch_flights(lat, lon, radius_km):
-    """Fetch flights from FR24 (with OpenSky fallback). Returns list of flight dicts."""
     flights = []
     try:
         from FlightRadar24 import FlightRadar24API
@@ -103,7 +105,6 @@ def fetch_flights(lat, lon, radius_km):
     except Exception:
         pass
 
-    # OpenSky fallback
     try:
         lat_d = radius_km / 111.0
         lon_d = radius_km / (111.0 * math.cos(math.radians(lat)))
@@ -174,7 +175,8 @@ def _background_poller():
     logged_ids = set()
     while True:
         try:
-            flights, _ = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=50)
+            flights, source = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=150)
+            socketio.emit("flights_update", {"flights": flights, "source": source})
             current_ids = {f["id"] for f in flights}
             for f in flights:
                 if (f["distance_km"] <= SIGHTING_RADIUS_KM
@@ -184,17 +186,13 @@ def _background_poller():
                         and f.get("destination_airport_iata")):
                     logged_ids.add(f["id"])
                     save_sighting(f)
-            # Remove flights that left the area so they can be logged again next time
             logged_ids &= current_ids
         except Exception:
             pass
-        time.sleep(POLL_INTERVAL_S)
+        socketio.sleep(POLL_INTERVAL_S)
 
 
-# Start background poller once (not in Flask reloader parent process)
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-    _t = threading.Thread(target=_background_poller, daemon=True)
-    _t.start()
+socketio.start_background_task(_background_poller)
 
 
 @app.route("/")
@@ -220,7 +218,6 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
-
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
 def delete_sighting(sighting_id):
     if IS_MACOS:
@@ -239,13 +236,12 @@ def delete_sighting(sighting_id):
 
 @app.route("/api/stats")
 def get_stats():
-    # Locally: proxy to Railway so both views show the same 24/7 data
     if IS_MACOS:
         try:
             resp = requests.get(f"{RAILWAY_URL}/api/stats", timeout=10)
             return jsonify(resp.json())
         except Exception:
-            pass  # Fall through to local DB if Railway unreachable
+            pass
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
@@ -281,9 +277,13 @@ def get_stats():
                 """SELECT date, COUNT(*) as count FROM sightings
                    GROUP BY date ORDER BY date DESC LIMIT 30"""
             ).fetchall()]
+            heatmap_raw = conn.execute(
+                "SELECT weekday, hour, COUNT(*) as count FROM sightings GROUP BY weekday, hour"
+            ).fetchall()
+            heatmap = {f"{r['weekday']},{r['hour']}": r['count'] for r in heatmap_raw}
             return jsonify({"total": total, "hourly": hourly, "weekdays": weekdays,
                             "aircraft": aircraft, "airlines": airlines, "routes": routes,
-                            "recent": recent, "daily": daily})
+                            "recent": recent, "daily": daily, "heatmap": heatmap})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -317,4 +317,4 @@ def speak():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5004))
-    app.run(debug=IS_MACOS, port=port)
+    socketio.run(app, debug=IS_MACOS, port=port)
