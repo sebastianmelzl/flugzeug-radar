@@ -222,22 +222,25 @@ def get_flights():
 
 @app.route("/admin/fix-hours")
 def fix_hours():
-    today = datetime.now(tz=TZ).strftime("%Y-%m-%d")
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        sample = [dict(r) for r in conn.execute(
-            "SELECT id, hour, timestamp, date FROM sightings ORDER BY id DESC LIMIT 20"
+        before = [dict(r) for r in conn.execute(
+            "SELECT id, hour, timestamp FROM sightings ORDER BY id DESC LIMIT 20"
         ).fetchall()]
-        # Old entries use space separator "2026-05-24 08:31:15", new use T+tz
-        conn.execute("""UPDATE sightings SET hour = 10,
-            timestamp = REPLACE(timestamp, ' 06:', ' 10:')
-            WHERE timestamp LIKE '% 06:%'""")
-        n6 = conn.execute("SELECT changes()").fetchone()[0]
-        conn.execute("""UPDATE sightings SET hour = 10,
-            timestamp = REPLACE(timestamp, ' 08:', ' 10:')
-            WHERE timestamp LIKE '% 08:%'""")
-        n8 = conn.execute("SELECT changes()").fetchone()[0]
-    return jsonify({"fixed_06": n6, "fixed_08": n8, "date": today, "sample_before": sample})
+        # Old entries: "2026-05-24 06:41:12" — chars 12-13 (1-based) are the hour
+        c6 = conn.execute("""UPDATE sightings
+            SET hour = 10,
+                timestamp = SUBSTR(timestamp,1,11) || '10' || SUBSTR(timestamp,14)
+            WHERE LENGTH(timestamp) = 19 AND SUBSTR(timestamp,12,2) = '06'""")
+        c8 = conn.execute("""UPDATE sightings
+            SET hour = 10,
+                timestamp = SUBSTR(timestamp,1,11) || '10' || SUBSTR(timestamp,14)
+            WHERE LENGTH(timestamp) = 19 AND SUBSTR(timestamp,12,2) = '08'""")
+        after = [dict(r) for r in conn.execute(
+            "SELECT id, hour, timestamp FROM sightings ORDER BY id DESC LIMIT 20"
+        ).fetchall()]
+    return jsonify({"fixed_06": c6.rowcount, "fixed_08": c8.rowcount,
+                    "before": before, "after": after})
 
 
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
