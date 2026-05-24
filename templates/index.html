@@ -891,11 +891,17 @@ function renderCard(f, isNew) {
 
         <!-- Section 1: Identity -->
         <div class="sec sec-identity">
-            <div style="display:flex;align-items:center;gap:10px">
-                <div class="callsign">${f.callsign || f.id}</div>
-                ${f.airline_iata ? `<img src="https://pics.avs.io/80/26/${f.airline_iata}.png" alt="${airline}" style="height:26px;max-width:90px;object-fit:contain;opacity:.9;filter:brightness(1.1)" onerror="this.style.display='none'">` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px">
+                <div>
+                    <div class="callsign">${f.callsign || f.id}</div>
+                    <div class="flight-num">${flightNum || '&nbsp;'}</div>
+                </div>
+                ${f.airline_iata ? `<div style="background:#fff;border-radius:8px;padding:5px 10px;display:flex;align-items:center;justify-content:center;min-width:64px;flex-shrink:0">
+                    <img src="https://pics.avs.io/120/36/${f.airline_iata}.png" alt="${airline}"
+                         style="height:28px;max-width:96px;object-fit:contain;display:block"
+                         onerror="this.parentElement.style.display='none'">
+                </div>` : ''}
             </div>
-            <div class="flight-num">${flightNum || '&nbsp;'}</div>
             <div class="id-row">
                 <div>
                     <div class="id-item-label">Airline</div>
