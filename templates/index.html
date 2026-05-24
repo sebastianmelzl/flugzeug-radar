@@ -76,6 +76,38 @@
         }
         @keyframes flashIn { 0%{background:#00d4aa18} 100%{background:#0d1528} }
 
+        .card.compact {
+            opacity: .7;
+            margin-bottom: 6px;
+        }
+        .card.compact:hover { opacity: 1; }
+        .compact-inner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 14px;
+            width: 100%;
+        }
+        .compact-callsign {
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: 700;
+            color: #94a3b8;
+            min-width: 80px;
+        }
+        .compact-type {
+            font-size: 11px;
+            color: #64748b;
+            flex: 1;
+        }
+        .compact-stats {
+            display: flex;
+            gap: 14px;
+            font-size: 11px;
+            color: #64748b;
+        }
+        .compact-stats span { white-space: nowrap; }
+
         .card.overhead {
             border-color: #f97316;
             border-width: 2px;
@@ -793,8 +825,29 @@ function radarSVG(f) {
     </svg>`;
 }
 
+/* ── Compact card for flights without airline/route (e.g. gliders) ── */
+function renderCompactCard(f) {
+    const acModel = aircraftName(f.aircraft_code);
+    const reg = f.registration || f.callsign || f.id;
+    return `
+    <div class="card compact" id="card-${f.id}">
+        <div class="compact-inner">
+            <div class="compact-callsign">${f.callsign || f.id}</div>
+            <div class="compact-type">${acModel || f.aircraft_code || '–'}${reg && reg !== f.callsign ? ' · ' + reg : ''}</div>
+            <div class="compact-stats">
+                <span>${f.distance_km} km</span>
+                <span>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') + ' ft' : '–'}</span>
+                <span>${f.ground_speed_kmh ? f.ground_speed_kmh + ' km/h' : '–'}</span>
+            </div>
+        </div>
+    </div>`;
+}
+
 /* ── Render card ── */
 function renderCard(f, isNew) {
+    const noRoute = !f.airline_iata && !f.airline_icao && !f.origin_airport_iata && !f.destination_airport_iata;
+    if (noRoute) return renderCompactCard(f);
+
     const status = approachStatus(f);
 
     // Identity
