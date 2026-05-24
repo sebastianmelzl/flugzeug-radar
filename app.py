@@ -211,7 +211,7 @@ def on_connect():
 
 @app.route("/")
 def index():
-    return render_template("index.html", default_lat=DEFAULT_LAT, default_lon=DEFAULT_LON)
+    return render_template("index.html", default_lat=DEFAULT_LAT, default_lon=DEFAULT_LON, is_local=IS_MACOS)
 
 
 @app.route("/stats")
