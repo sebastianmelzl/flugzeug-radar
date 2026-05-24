@@ -168,7 +168,11 @@ def _background_poller():
             flights, _ = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=50)
             current_ids = {f["id"] for f in flights}
             for f in flights:
-                if f["distance_km"] <= SIGHTING_RADIUS_KM and f["id"] not in logged_ids:
+                if (f["distance_km"] <= SIGHTING_RADIUS_KM
+                        and f["id"] not in logged_ids
+                        and (f.get("airline_iata") or f.get("airline_icao"))
+                        and f.get("origin_airport_iata")
+                        and f.get("destination_airport_iata")):
                     logged_ids.add(f["id"])
                     save_sighting(f)
             # Remove flights that left the area so they can be logged again next time
