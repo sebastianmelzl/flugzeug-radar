@@ -353,6 +353,14 @@ def spotify_pause():
     return jsonify({"ok": True, "was_playing": _spotify_was_playing})
 
 
+@app.route("/api/spotify/resume", methods=["POST"])
+def spotify_resume():
+    if not IS_MACOS:
+        return jsonify({"ok": False}), 200
+    _osascript('tell application "Spotify" to play')
+    return jsonify({"ok": True})
+
+
 @app.route("/api/speak", methods=["POST"])
 def speak():
     global _speak_process

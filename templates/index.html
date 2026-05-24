@@ -376,6 +376,7 @@
     <div class="controls">
         <a href="/stats" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.borderColor='#00d4aa';this.style.color='#00d4aa'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">📊 Statistik</a>
         <button class="map-btn" id="mapToggle" onclick="toggleMap()">🗺 Karte</button>
+        {% if is_local %}<button class="map-btn" id="spotifyBtn" onclick="toggleSpotify()" title="Spotify pausieren/fortsetzen">⏸ Spotify</button>{% endif %}
         <span class="meta"><span class="live-dot"></span>LIVE</span>
         <select id="radiusSelect">
             <option value="10" selected>10 km</option>
@@ -893,8 +894,25 @@ async function playDing() {
     } catch {}
 }
 
+let _spotifyPaused = false;
+
 async function spotifyPause() {
     try { await fetch('/api/spotify/pause', { method: 'POST' }); } catch {}
+}
+
+async function toggleSpotify() {
+    const btn = document.getElementById('spotifyBtn');
+    try {
+        if (_spotifyPaused) {
+            await fetch('/api/spotify/resume', { method: 'POST' });
+            _spotifyPaused = false;
+            btn.textContent = '⏸ Spotify';
+        } else {
+            await fetch('/api/spotify/pause', { method: 'POST' });
+            _spotifyPaused = true;
+            btn.textContent = '▶ Spotify';
+        }
+    } catch {}
 }
 
 async function announce(f) {
