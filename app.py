@@ -220,6 +220,20 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/admin/fix-hours")
+def fix_hours():
+    today = datetime.now(tz=TZ).strftime("%Y-%m-%d")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""UPDATE sightings SET hour = 10,
+            timestamp = REPLACE(timestamp, 'T06:', 'T10:')
+            WHERE hour = 6 AND date = ?""", (today,))
+        n6 = conn.execute("SELECT changes()").fetchone()[0]
+        conn.execute("""UPDATE sightings SET hour = 10,
+            timestamp = REPLACE(timestamp, 'T08:', 'T10:')
+            WHERE hour = 8 AND date = ?""", (today,))
+        n8 = conn.execute("SELECT changes()").fetchone()[0]
+    return jsonify({"fixed_hour6": n6, "fixed_hour8": n8, "date": today})
+
 
 @app.route("/api/sighting/<int:sighting_id>", methods=["DELETE"])
 def delete_sighting(sighting_id):
