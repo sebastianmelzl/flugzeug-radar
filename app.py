@@ -329,20 +329,23 @@ def _spotify_resume():
         _osascript('tell application "Spotify" to play')
 
 
-def _speak_background(text, mp3_path):
+def _speak_background(text, mp3_path, should_resume):
     global _speak_process
     try:
-        subprocess.run(
-            ["python3", "-m", "edge_tts", "--voice", "de-DE-KatjaNeural",
-             "--text", text, "--write-media", mp3_path],
-            check=True
-        )
-        _speak_process = subprocess.Popen(["afplay", mp3_path])
-    except Exception:
-        _speak_process = subprocess.Popen(["say", "-v", "Anna", "-r", "160", text])
-    if _speak_process:
-        _speak_process.wait()
-    _spotify_resume()
+        try:
+            subprocess.run(
+                ["python3", "-m", "edge_tts", "--voice", "de-DE-KatjaNeural",
+                 "--text", text, "--write-media", mp3_path],
+                check=True
+            )
+            _speak_process = subprocess.Popen(["afplay", mp3_path])
+        except Exception:
+            _speak_process = subprocess.Popen(["say", "-v", "Anna", "-r", "160", text])
+        if _speak_process:
+            _speak_process.wait()
+    finally:
+        if should_resume:
+            _osascript('tell application "Spotify" to play')
 
 
 @app.route("/api/spotify/pause", methods=["POST"])
@@ -372,7 +375,8 @@ def speak():
     if _speak_process and _speak_process.poll() is None:
         _speak_process.terminate()
     mp3_path = "/tmp/flugzeug_radar_speech.mp3"
-    threading.Thread(target=_speak_background, args=(text, mp3_path), daemon=True).start()
+    should_resume = _spotify_was_playing  # capture now before any concurrent call overwrites it
+    threading.Thread(target=_speak_background, args=(text, mp3_path, should_resume), daemon=True).start()
     return jsonify({"ok": True})
 
 
