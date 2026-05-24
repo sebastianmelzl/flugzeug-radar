@@ -807,19 +807,16 @@ function showToast(msg, color) {
     t._timer = setTimeout(() => t.style.opacity = '0', 3000);
 }
 
-async function speak(text) {
+async function speak(text, resumeSpotify = false) {
     try {
-        const resp = await fetch('/api/speak', {
+        await fetch('/api/speak', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ text, resume_spotify: resumeSpotify })
         });
-        if (resp.ok) {
-            showToast('🔊 macOS Siri Stimme', '#00d4aa');
-        } else {
-            showToast('⚠ API Fehler ' + resp.status, '#ef4444');
-        }
     } catch(e) {
+        // fetch failed → backend never started, resume manually
+        if (resumeSpotify) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
         showToast('⚠ Fetch fehlgeschlagen: ' + e.message, '#ef4444');
     }
 }
@@ -898,7 +895,11 @@ async function playDing() {
 let _spotifyPaused = false;
 
 async function spotifyPause() {
-    try { await fetch('/api/spotify/pause', { method: 'POST' }); } catch {}
+    try {
+        const r = await fetch('/api/spotify/pause', { method: 'POST' });
+        const d = await r.json();
+        return d.was_playing || false;
+    } catch { return false; }
 }
 
 async function toggleSpotify() {
@@ -917,9 +918,9 @@ async function toggleSpotify() {
 }
 
 async function announce(f) {
-    await spotifyPause();
+    const wasPlaying = await spotifyPause();
     await playChime();
-    speak(buildSpeechText(f));
+    speak(buildSpeechText(f), wasPlaying);
 }
 
 function buildPassoverText(f) {
@@ -933,9 +934,9 @@ function buildPassoverText(f) {
 }
 
 async function announcePassover(f) {
-    await spotifyPause();
+    const wasPlaying = await spotifyPause();
     await playDing();
-    speak(buildPassoverText(f));
+    speak(buildPassoverText(f), wasPlaying);
 }
 
 async function speakFlight(id) {

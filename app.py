@@ -375,7 +375,7 @@ def speak():
     if _speak_process and _speak_process.poll() is None:
         _speak_process.terminate()
     mp3_path = "/tmp/flugzeug_radar_speech.mp3"
-    should_resume = _spotify_was_playing  # capture now before any concurrent call overwrites it
+    should_resume = bool(request.json.get("resume_spotify", False))
     threading.Thread(target=_speak_background, args=(text, mp3_path, should_resume), daemon=True).start()
     return jsonify({"ok": True})
 
