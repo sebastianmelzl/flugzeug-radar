@@ -1,5 +1,11 @@
-import eventlet
-eventlet.monkey_patch()
+import sys
+import os
+
+IS_MACOS = sys.platform == "darwin"
+
+if not IS_MACOS:
+    import eventlet
+    eventlet.monkey_patch()
 
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
@@ -7,15 +13,14 @@ import requests
 import math
 import subprocess
 import sqlite3
-import os
-import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Berlin")
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+_async_mode = "threading" if IS_MACOS else "eventlet"
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 
 DEFAULT_LAT = 49.83580017089844
 DEFAULT_LON = 8.829106330871582
@@ -25,8 +30,6 @@ RAILWAY_URL = "https://flugzeug-radar-production.up.railway.app"
 
 _data_dir = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(_data_dir, "sightings.db")
-
-IS_MACOS = sys.platform == "darwin"
 
 
 def init_db():
@@ -317,4 +320,4 @@ def speak():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5004))
-    socketio.run(app, debug=IS_MACOS, port=port)
+    socketio.run(app, debug=False, port=port, allow_unsafe_werkzeug=True)
