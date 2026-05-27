@@ -845,7 +845,7 @@
     <div id="map"></div>
     <button id="mapResetBtn" onclick="resetMapSelection()">↩ Zurück</button>
     <button id="mapFraBtn" onclick="if(_map)_map.setView([50.0379,8.5622],12)" title="Zoom auf FRA">✈ FRA</button>
-    <button id="mapHomeBtn" onclick="if(_map)_map.setView([userLat,userLon],12)" title="Zoom auf Reinheim">📍 Reinheim</button>
+    <button id="mapHomeBtn" onclick="if(_map)_map.setView([DEFAULT_LAT,DEFAULT_LON],12)" title="Zoom auf Reinheim">📍 Reinheim</button>
 </div>
 
 <main>
@@ -2590,7 +2590,7 @@ function mapTileUrl() {
 
 function initMap() {
     if (_map) return;
-    _map = L.map('map', { zoomControl: true }).setView([userLat, userLon], 10);
+    _map = L.map('map', { zoomControl: true }).setView([DEFAULT_LAT, DEFAULT_LON], 10);
     _tileLayer = L.tileLayer(mapTileUrl(), { attribution: '© OpenStreetMap © CARTO', maxZoom: 18 }).addTo(_map);
     L.circleMarker([userLat, userLon], {
         radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
