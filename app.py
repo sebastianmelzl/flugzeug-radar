@@ -925,7 +925,7 @@ ALLOWED_VOICES = {
     "de-DE-SeraphinaNeural", "de-DE-ConradNeural", "de-DE-KillianNeural",
     "de-DE-RalfNeural", "de-AT-IngridNeural", "de-AT-JonasNeural", "de-CH-LeniNeural",
 }
-DEFAULT_VOICE = "de-DE-KatjaNeural"
+DEFAULT_VOICE = "de-CH-LeniNeural"
 
 def _duck_volume():
     """Lower system volume to ~30 % of current.
