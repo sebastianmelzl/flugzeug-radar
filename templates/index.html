@@ -1723,6 +1723,32 @@ function chimeTypeForFlight(f) {
     return LARGE_AC.has(f.aircraft_code) ? 'big' : 'small';
 }
 
+async function _playAudioBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+        // Try AudioContext first (works when unlocked)
+        const ctx = await getAudioCtx();
+        if (ctx.state === 'running') {
+            const arrayBuf = await blob.arrayBuffer();
+            const decoded = await ctx.decodeAudioData(arrayBuf);
+            await new Promise(resolve => {
+                const src = ctx.createBufferSource();
+                src.buffer = decoded; src.connect(ctx.destination);
+                src.onended = resolve; src.start();
+            });
+            return;
+        }
+    } catch(e) { console.warn('[TTS] AudioContext playback failed, falling back to <audio>:', e); }
+    // Fallback: HTML5 <audio> element
+    await new Promise(resolve => {
+        const audio = new Audio(url);
+        audio.onended = resolve;
+        audio.onerror = resolve;
+        audio.play().catch(resolve);
+    });
+    URL.revokeObjectURL(url);
+}
+
 // Client-side TTS queue — guarantees sequential non-overlapping playback on all devices
 let _ttsQueue = Promise.resolve();
 
@@ -1741,36 +1767,42 @@ async function _doSpeak(text, pauseSpotify, chimeType) {
             body: JSON.stringify({ text, voice: selectedVoice() })
         });
         if (resp.ok) {
-            const buf = await resp.arrayBuffer();
-            const ctx = await getAudioCtx();
-            const decoded = await ctx.decodeAudioData(buf);
-            await new Promise(resolve => {
-                const src = ctx.createBufferSource();
-                src.buffer = decoded;
-                src.connect(ctx.destination);
-                src.onended = resolve;
-                src.start();
-            });
+            const blob = await resp.blob();
+            await _playAudioBlob(blob);
         }
     } catch(e) { console.warn('[TTS]', e); }
     if (pauseSpotify && IS_LOCAL) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
 }
 
 let _audioCtx = null;
+let _audioUnlocked = false;
+
 async function getAudioCtx() {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state === 'suspended') {
-        // resume() can hang forever on macOS — cap at 500ms
-        try { await Promise.race([_audioCtx.resume(), new Promise(r => setTimeout(r, 500))]); } catch {}
+    if (_audioCtx.state !== 'running') {
+        try { await _audioCtx.resume(); } catch(e) {}
     }
     return _audioCtx;
 }
-// Keep AudioContext running: resume on every click and when tab regains focus
-function _resumeAudio() {
+
+// iOS requires a silent buffer to be played within a user gesture to fully unlock audio
+async function _ensureAudioUnlocked() {
+    if (_audioUnlocked) return;
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
+    try {
+        if (_audioCtx.state !== 'running') await _audioCtx.resume();
+        const buf = _audioCtx.createBuffer(1, 1, _audioCtx.sampleRate);
+        const src = _audioCtx.createBufferSource();
+        src.buffer = buf; src.connect(_audioCtx.destination); src.start(0);
+        _audioUnlocked = true;
+    } catch(e) {}
 }
-document.addEventListener('click', _resumeAudio);
+
+function _resumeAudio() {
+    _ensureAudioUnlocked().catch(() => {});
+}
+document.addEventListener('click',      () => _ensureAudioUnlocked().catch(() => {}));
+document.addEventListener('touchstart', () => _ensureAudioUnlocked().catch(() => {}), { passive: true });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) _resumeAudio(); });
 
 function playChime() {
@@ -2007,7 +2039,7 @@ async function announceBalcony(f) {
 }
 
 async function speakFlight(id) {
-    _resumeAudio(); // synchron im User-Gesture-Kontext resumieren
+    await _ensureAudioUnlocked(); // iOS: silent buffer im User-Gesture-Kontext
     const f = currentFlights.find(f => f.id === id);
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
