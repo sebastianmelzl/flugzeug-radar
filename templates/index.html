@@ -638,14 +638,17 @@
         .info-modal-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,.72); z-index: 9000;
-            align-items: center; justify-content: center; padding: 16px;
+            align-items: flex-start; justify-content: center;
+            padding: 16px; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .info-modal-overlay.open { display: flex; }
         .info-modal-card {
             background: #1a1f2e; border-radius: 16px;
             border: 1px solid #2a3050; max-width: 500px; width: 100%;
-            max-height: 90vh; overflow-y: auto; position: relative;
+            position: relative; margin: auto;
             box-shadow: 0 24px 64px rgba(0,0,0,.7);
+            flex-shrink: 0;
         }
         .info-modal-close {
             position: absolute; top: 12px; right: 12px;
@@ -781,7 +784,7 @@
 
             /* ── Info Modal ── */
             .info-modal-overlay { padding: 8px; }
-            .info-modal-card { max-height: 96vh; border-radius: 12px; }
+            .info-modal-card { border-radius: 12px; }
             .info-modal-grid { gap: 10px; }
             .info-modal-body { padding: 14px 14px 18px; }
 
@@ -2919,8 +2922,9 @@ function openInfoModal(flightId) {
     const f = currentFlights.find(x => x.id === flightId);
     if (!f) return;
 
-    document.getElementById('infoModal').classList.add('open');
-    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('infoModal');
+    overlay.classList.add('open');
+    overlay.scrollTop = 0;
 
     const photoEl  = document.getElementById('imPhoto');
     const photoBox = document.getElementById('imPhotoPlaceholder');
@@ -3047,12 +3051,14 @@ function openInfoModal(flightId) {
 
 function closeInfoModal() {
     document.getElementById('infoModal').classList.remove('open');
-    document.body.style.overflow = '';
 }
+document.getElementById('infoModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('infoModal')) closeInfoModal();
+});
 </script>
 
 <!-- Info Modal -->
-<div id="infoModal" class="info-modal-overlay" onclick="if(event.target===this)closeInfoModal()">
+<div id="infoModal" class="info-modal-overlay">
     <div class="info-modal-card">
         <button class="info-modal-close" onclick="closeInfoModal()">✕</button>
         <img id="imPhoto" class="info-modal-photo" alt="Flugzeugfoto" referrerpolicy="no-referrer">
