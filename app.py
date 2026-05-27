@@ -13,7 +13,7 @@ if not IS_MACOS:
     from gevent import monkey
     monkey.patch_all()
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 from flask_socketio import SocketIO
 import requests
 import math
