@@ -1079,6 +1079,36 @@ def speak():
     return jsonify({"ok": True})
 
 
+@app.route("/api/tts", methods=["POST"])
+def api_tts():
+    """Generate TTS audio and return MP3 — works on all platforms."""
+    data = request.json or {}
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "no text"}), 400
+    voice = data.get("voice", DEFAULT_VOICE)
+    if voice not in ALLOWED_VOICES:
+        voice = DEFAULT_VOICE
+    mp3_path = f"/tmp/flugzeug_tts_{int(time.time() * 1000)}_{os.getpid()}.mp3"
+    try:
+        subprocess.run(
+            ["python3", "-m", "edge_tts", "--voice", voice, "--text", text, "--write-media", mp3_path],
+            check=True, timeout=15, capture_output=True
+        )
+        with open(mp3_path, "rb") as f:
+            audio_data = f.read()
+        return Response(audio_data, mimetype="audio/mpeg",
+                        headers={"Cache-Control": "no-cache", "Content-Length": str(len(audio_data))})
+    except Exception as e:
+        print(f"[TTS] /api/tts error: {e}", flush=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            os.remove(mp3_path)
+        except OSError:
+            pass
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5004))
     socketio.run(app, debug=False, port=port, allow_unsafe_werkzeug=True)

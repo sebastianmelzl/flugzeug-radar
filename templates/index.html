@@ -814,8 +814,8 @@
     <div class="controls">
         <a href="/stats" class="map-btn" style="text-decoration:none">📊 Statistik</a>
         <button class="map-btn" id="mapToggle" onclick="toggleMap()">🗺 Karte</button>
-        {% if is_local %}<button class="map-btn" id="spotifyBtn" onclick="toggleSpotify()" title="Spotify pausieren/fortsetzen">⏸ Spotify</button>
-        <button class="map-btn active" id="balconyToggle" onclick="toggleBalconyAnnouncements()" title="Balkonflug-Ansagen ein/aus">🪑 Balkon</button>{% endif %}
+        {% if is_local %}<button class="map-btn" id="spotifyBtn" onclick="toggleSpotify()" title="Spotify pausieren/fortsetzen">⏸ Spotify</button>{% endif %}
+        <button class="map-btn active" id="balconyToggle" onclick="toggleBalconyAnnouncements()" title="Balkonflug-Ansagen ein/aus">🪑 Balkon</button>
         <button class="map-btn" id="themeToggle" onclick="toggleTheme()" title="Theme wechseln">☀️</button>
         <span class="meta"><span class="live-dot"></span>LIVE</span>
         <select id="voiceSelect" title="Stimme auswählen">
@@ -1723,16 +1723,37 @@ function chimeTypeForFlight(f) {
     return LARGE_AC.has(f.aircraft_code) ? 'big' : 'small';
 }
 
+// Client-side TTS queue — guarantees sequential non-overlapping playback on all devices
+let _ttsQueue = Promise.resolve();
+
 async function speak(text, pauseSpotify = false, chimeType = null) {
+    _ttsQueue = _ttsQueue.then(() => _doSpeak(text, pauseSpotify, chimeType)).catch(() => {});
+}
+
+async function _doSpeak(text, pauseSpotify, chimeType) {
+    if (pauseSpotify) fetch('/api/spotify/pause', { method: 'POST' }).catch(() => {});
+    if (chimeType === 'big')   await playChime();
+    else if (chimeType === 'small') await playDing();
     try {
-        await fetch('/api/speak', {
+        const resp = await fetch('/api/tts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, pause_spotify: pauseSpotify, chime_type: chimeType, voice: selectedVoice() })
+            body: JSON.stringify({ text, voice: selectedVoice() })
         });
-    } catch(e) {
-        showToast('⚠ Fetch fehlgeschlagen: ' + e.message, '#ef4444');
-    }
+        if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            const ctx = await getAudioCtx();
+            const decoded = await ctx.decodeAudioData(buf);
+            await new Promise(resolve => {
+                const src = ctx.createBufferSource();
+                src.buffer = decoded;
+                src.connect(ctx.destination);
+                src.onended = resolve;
+                src.start();
+            });
+        }
+    } catch(e) { console.warn('[TTS]', e); }
+    if (pauseSpotify) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
 }
 
 let _audioCtx = null;
@@ -1908,8 +1929,7 @@ function buildPassoverText(f) {
 }
 
 async function announcePassover(f) {
-    playDing();
-    speak(buildPassoverText(f), true, null);
+    speak(buildPassoverText(f), true, 'small');
 }
 
 function _loungerBearing(f) {
@@ -2124,9 +2144,7 @@ function renderBigCard(f, isNew) {
         f.registration ? `<a class="fr24-btn" href="https://www.flightradar24.com/data/aircraft/${f.registration.toLowerCase()}#" target="_blank" rel="noreferrer" title="FlightRadar24">FR24↗</a>` : '',
         f.icao24 ? `<a class="fr24-btn" href="https://globe.adsbexchange.com/?icao=${f.icao24.toUpperCase()}&zoom=11" target="_blank" title="ADS-B Exchange">ADSB↗</a>` : '',
     ].join('') : '';
-    const speakBtnHTML = IS_LOCAL
-        ? `<button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen" style="width:36px;height:32px;margin:0">🔊</button>`
-        : '';
+    const speakBtnHTML = `<button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen" style="width:36px;height:32px;margin:0">🔊</button>`;
     const infoBtnHTML = `<button class="info-btn" onclick="openInfoModal('${f.id}')" title="Flugzeuginfo">ℹ</button>`;
 
     return `
@@ -2256,7 +2274,7 @@ function renderCard(f, isNew) {
     // Status pill color
 
     const mil = isMilitary(f);
-    const speakBtn = IS_LOCAL ? '<button class="speak-btn" onclick="speakFlight(\'' + f.id + '\')" title="Vorlesen">🔊</button>' : '';
+    const speakBtn = '<button class="speak-btn" onclick="speakFlight(\'' + f.id + '\')" title="Vorlesen">🔊</button>';
     return `
     <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''} ${mil?'military':''}" id="card-${f.id}">
         ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
@@ -2364,7 +2382,6 @@ function renderCard(f, isNew) {
 
 /* ── Announcement logic — runs on ALL flights (up to 150 km), independent of display radius ── */
 function _runAnnouncements(allFlights) {
-    if (!IS_LOCAL) return;
     const allIds = new Set(allFlights.map(f => f.id));
     const oldIds = _prevAnnouncementIds;
     _prevAnnouncementIds = allIds;
