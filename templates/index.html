@@ -1731,8 +1731,8 @@ async function speak(text, pauseSpotify = false, chimeType = null) {
 }
 
 async function _doSpeak(text, pauseSpotify, chimeType) {
-    if (pauseSpotify) fetch('/api/spotify/pause', { method: 'POST' }).catch(() => {});
-    if (chimeType === 'big')   await playChime();
+    if (pauseSpotify && IS_LOCAL) fetch('/api/spotify/pause', { method: 'POST' }).catch(() => {});
+    if (chimeType === 'big')        await playChime();
     else if (chimeType === 'small') await playDing();
     try {
         const resp = await fetch('/api/tts', {
@@ -1753,7 +1753,7 @@ async function _doSpeak(text, pauseSpotify, chimeType) {
             });
         }
     } catch(e) { console.warn('[TTS]', e); }
-    if (pauseSpotify) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
+    if (pauseSpotify && IS_LOCAL) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
 }
 
 let _audioCtx = null;
@@ -2007,13 +2007,12 @@ async function announceBalcony(f) {
 }
 
 async function speakFlight(id) {
+    _resumeAudio(); // synchron im User-Gesture-Kontext resumieren
     const f = currentFlights.find(f => f.id === id);
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
-    await spotifyPause();
-    await playChime();
-    speak(buildSpeechText(f));
+    speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
 /* ── Helpers ── */
