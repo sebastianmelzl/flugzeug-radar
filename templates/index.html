@@ -1725,29 +1725,15 @@ function chimeTypeForFlight(f) {
 
 async function _playAudioBlob(blob) {
     const url = URL.createObjectURL(blob);
-    // Primary: AudioContext (desktop/Android + iOS after unlock)
-    try {
-        const ctx = await getAudioCtx();
-        if (ctx.state === 'running') {
-            const arrayBuf = await blob.arrayBuffer();
-            const decoded = await ctx.decodeAudioData(arrayBuf);
-            await new Promise(resolve => {
-                const src = ctx.createBufferSource();
-                src.buffer = decoded; src.connect(ctx.destination);
-                src.onended = resolve; src.start();
-            });
-            URL.revokeObjectURL(url);
-            return;
-        }
-    } catch(e) { console.warn('[TTS] AudioContext failed, using <audio> fallback:', e); }
-    // Fallback: persistent _ttsAudio element (pre-unlocked by _syncUnlockAudio in gesture)
+    // Always use the persistent _ttsAudio element — works on all platforms including iOS
+    // once _syncUnlockAudio has been called within a gesture.
     await new Promise(resolve => {
         const cleanup = () => { URL.revokeObjectURL(url); resolve(); };
         _ttsAudio.onended = cleanup;
         _ttsAudio.onerror = cleanup;
         _ttsAudio.src = url;
         _ttsAudio.load();
-        _ttsAudio.play().catch(e => { console.warn('[TTS] <audio>.play failed:', e); cleanup(); });
+        _ttsAudio.play().catch(e => { console.warn('[TTS] play failed:', e); cleanup(); });
     });
 }
 
@@ -1789,19 +1775,24 @@ async function getAudioCtx() {
     return _audioCtx;
 }
 
-// iOS: must be called synchronously within a user gesture (no await!)
-// Calling .play() and .resume() synchronously registers the gesture — the returned
-// promises resolve later, but iOS has already granted permission at call time.
+// iOS: must be called synchronously within a user gesture (no await!).
+// Wrapped in try/catch so no error leaks and breaks other click handlers.
 function _syncUnlockAudio() {
-    if (!_audioUnlocked) {
-        _ttsAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-        _ttsAudio.volume = 0;
-        _ttsAudio.play().catch(() => {});
-        _ttsAudio.volume = 1;
-        _audioUnlocked = true;
-    }
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state !== 'running') _audioCtx.resume().catch(() => {});
+    try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!_audioUnlocked) {
+            // AudioContext: resume + start a 1-sample silent buffer (iOS needs a source node started)
+            _audioCtx.resume().catch(() => {});
+            const buf = _audioCtx.createBuffer(1, 1, _audioCtx.sampleRate);
+            const src = _audioCtx.createBufferSource();
+            src.buffer = buf; src.connect(_audioCtx.destination); src.start(0);
+            // <audio> element: play silent data-URI to unlock for later src swaps
+            _ttsAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+            _ttsAudio.play().catch(() => {});
+            _audioUnlocked = true;
+        }
+        if (_audioCtx.state !== 'running') _audioCtx.resume().catch(() => {});
+    } catch(e) { console.warn('[Audio] unlock failed:', e); }
 }
 
 document.addEventListener('click',      () => _syncUnlockAudio());
