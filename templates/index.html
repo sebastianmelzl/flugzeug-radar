@@ -1989,18 +1989,18 @@ function _isOverflight(f) {
 }
 
 function _passoverDistThresh(f) {
-    // Rwy18 departures climb steeply — short lead time
-    if (isRwy18Departure(f)) return 5.5;
-    const rel = _loungerBearing(f).rel;
+    if (isRwy18Departure(f)) return 5;
+    const { rel } = _loungerBearing(f);
     const approaching = approachStatus(f)?.label === 'Auf dich zu';
-    // Visible arc (West/NW/N/ENE, rel < 200°):
-    //   approaching → 15 km early warning so you can look toward them
-    //   passing/receding → 5 km (close enough to actually see overhead)
-    if (rel < 200) return approaching ? 15 : 5;
-    // East sector (rel 200°–280°): house blocks → 3 km
-    if (rel < 280) return 3;
-    // South sector (rel 280°–360°): house blocks fully → 1 km
-    return 1;
+    if (rel < 200) {
+        // Only the narrow west-facing arc (rel < 45° ≈ WSW–WNW) gets the 15 km
+        // early warning — those flights approach from the balcony view direction.
+        // Everything else (NW, N, NE, overhead) fires at 5 km.
+        if (approaching && rel < 45) return 15;
+        return 5;
+    }
+    if (rel < 280) return 3;  // East: house blocks until 3 km
+    return 1;                 // South: house blocks fully until 1 km
 }
 
 function _balconyLookDir(f) {
