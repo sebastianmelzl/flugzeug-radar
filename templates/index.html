@@ -1992,11 +1992,14 @@ function _passoverDistThresh(f) {
     // Rwy18 departures climb steeply — short lead time
     if (isRwy18Departure(f)) return 5.5;
     const rel = _loungerBearing(f).rel;
-    // Visible arc (West/NW/N/ENE, rel < 200°): balcony open → 15km
-    if (rel < 200) return 15;
-    // East sector (rel 200°–280°): house blocks → 3km
+    const approaching = approachStatus(f)?.label === 'Auf dich zu';
+    // Visible arc (West/NW/N/ENE, rel < 200°):
+    //   approaching → 15 km early warning so you can look toward them
+    //   passing/receding → 5 km (close enough to actually see overhead)
+    if (rel < 200) return approaching ? 15 : 5;
+    // East sector (rel 200°–280°): house blocks → 3 km
     if (rel < 280) return 3;
-    // South sector (rel 280°–360°): house blocks fully → 1km
+    // South sector (rel 280°–360°): house blocks fully → 1 km
     return 1;
 }
 
