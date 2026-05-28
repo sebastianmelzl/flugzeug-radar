@@ -1946,9 +1946,20 @@ function buildPassoverText(f) {
     const age  = acAgePhrase(f.year);
     const orig = apName(f.origin_airport_iata);
     const dest = apName(f.destination_airport_iata);
-    const dir  = _passoverFromDir(f);
-    let text = 'Schau nach oben';
-    if (dir) text += `, ${dir}`;
+    const isApproaching = approachStatus(f)?.label === 'Auf dich zu';
+    let text;
+    if (isApproaching) {
+        // Flight is heading toward user — look straight up; mention where it comes from
+        text = 'Schau nach oben';
+        const dir = _passoverFromDir(f);
+        if (dir) text += `, ${dir}`;
+    } else {
+        // Flight is passing by — tell the user which direction to look
+        const abs = _loungerBearing(f).abs;
+        const dirs = ['Norden','Nordosten','Osten','Südosten','Süden','Südwesten','Westen','Nordwesten'];
+        const lookDir = isRwy18Departure(f) ? 'Norden' : dirs[Math.round(abs / 45) % 8];
+        text = `Schau nach ${lookDir}`;
+    }
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
