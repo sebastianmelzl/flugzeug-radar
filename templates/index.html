@@ -2116,7 +2116,7 @@ function renderCompactCard(f) {
             <div class="compact-callsign">${f.callsign || f.id}</div>
             <div class="compact-type">${acModel || f.aircraft_code || '–'}${reg && reg !== f.callsign ? ' · ' + reg : ''}</div>
             <div class="compact-stats">
-                <span>${f.distance_km} km</span>
+                <span><span class="dist-interp">${f.distance_km}</span> km</span>
                 <span>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') + ' ft' : '–'}</span>
                 <span>${f.ground_speed_kmh ? f.ground_speed_kmh + ' km/h' : '–'}</span>
             </div>
@@ -2388,7 +2388,7 @@ function renderCard(f, isNew) {
                 </div>
                 <div>
                     <div class="live-label">Entfernung</div>
-                    <div class="live-value">${f.distance_km} <span class="live-unit">km</span></div>
+                    <div class="live-value"><span class="dist-interp">${f.distance_km}</span> <span class="live-unit">km</span></div>
                 </div>
                 <div style="grid-column:1/-1">
                     <div class="live-label">Steigrate</div>
@@ -2465,6 +2465,15 @@ function _runAnnouncements(allFlights) {
     });
     for (const id of dingedIds) { if (!allIds.has(id)) dingedIds.delete(id); }
 
+    _checkThresholds(allFlights);
+
+    for (const id of announcedOverhead) { if (!allIds.has(id)) announcedOverhead.delete(id); }
+    for (const id of announcedPassover)  { if (!allIds.has(id)) announcedPassover.delete(id); }
+    for (const id of announcedBalcony)   { if (!allIds.has(id)) announcedBalcony.delete(id); }
+}
+
+// Distance-threshold checks separated so the interpolation tick can call them too
+function _checkThresholds(allFlights) {
     // Overhead: ≤5 km, heading toward user — always fires regardless of balcony toggle
     allFlights.filter(f => {
         if (isCompact(f)) return false;
@@ -2478,7 +2487,7 @@ function _runAnnouncements(allFlights) {
         announce(f);
     });
 
-    // Passover: rwy18 → ≤5.5km; other overflights → ≤10km; or elevation ≥45° (balcony on only)
+    // Passover: rwy18 → ≤5.5km; other overflights → direction-based; or elevation ≥45° (balcony on only)
     allFlights.filter(f => {
         if (isCompact(f)) return false;
         if (announcedPassover.has(f.id)) return false;
@@ -2489,7 +2498,7 @@ function _runAnnouncements(allFlights) {
         announcePassover(f);
     });
 
-    // Balcony: visible flights — 25 km for approaching, 15 km for passing-by; never for rwy18 departures
+    // Balcony: visible flights — 25 km approaching, 15 km passing; never for rwy18
     allFlights.filter(f => {
         if (isCompact(f)) return false;
         if (announcedBalcony.has(f.id)) return false;
@@ -2503,10 +2512,6 @@ function _runAnnouncements(allFlights) {
         announcedBalcony.add(f.id);
         if (_balconyEnabled) announceBalcony(f);
     });
-
-    for (const id of announcedOverhead) { if (!allIds.has(id)) announcedOverhead.delete(id); }
-    for (const id of announcedPassover)  { if (!allIds.has(id)) announcedPassover.delete(id); }
-    for (const id of announcedBalcony)   { if (!allIds.has(id)) announcedBalcony.delete(id); }
 }
 
 /* ── Render flights from data ── */
@@ -2842,6 +2847,67 @@ function toggleMap() {
     if (show) { initMap(); if (_map) _map.invalidateSize(); updateMap(currentFlights); }
 }
 
+/* ── Live distance interpolation ── */
+// Stores the anchor state captured at each server push
+const _interpBases = new Map();
+
+function _updateInterpBases(allFlights) {
+    const now = Date.now();
+    const ids = new Set(allFlights.map(f => f.id));
+    allFlights.forEach(f => {
+        if (f.latitude != null && f.longitude != null &&
+            f.ground_speed_kmh > 0 && f.heading != null) {
+            _interpBases.set(f.id, {
+                baseLat: f.latitude, baseLon: f.longitude,
+                speed_kmh: f.ground_speed_kmh, heading: f.heading, baseTs: now
+            });
+        }
+    });
+    for (const id of _interpBases.keys()) { if (!ids.has(id)) _interpBases.delete(id); }
+}
+
+function _haversineDist(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+    const dφ = (lat2 - lat1) * Math.PI/180, dλ = (lon2 - lon1) * Math.PI/180;
+    const a = Math.sin(dφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function _interpTick() {
+    if (!_lastAllFlights || !_lastAllFlights.length) return;
+    const now = Date.now();
+
+    // Dead-reckon each flight and update f.distance_km in-place
+    _lastAllFlights.forEach(f => {
+        const b = _interpBases.get(f.id);
+        if (!b) return;
+        const elapsed = (now - b.baseTs) / 1000;
+        if (elapsed < 0.05) return;
+        const moved_km = b.speed_kmh * elapsed / 3600;
+        const hr = b.heading * Math.PI / 180;
+        const cosLat = Math.cos(b.baseLat * Math.PI / 180) || 0.001;
+        const newLat = b.baseLat + moved_km * Math.cos(hr) / 111.32;
+        const newLon = b.baseLon + moved_km * Math.sin(hr) / (111.32 * cosLat);
+        f.distance_km = parseFloat(_haversineDist(userLat, userLon, newLat, newLon).toFixed(1));
+    });
+
+    // Update only the distance text nodes in each visible card
+    currentFlights.forEach(f => {
+        const card = document.getElementById(`card-${f.id}`);
+        if (!card) return;
+        const bn = card.querySelector('.bc-dist-num');
+        if (bn) bn.textContent = f.distance_km;
+        const di = card.querySelector('.dist-interp');
+        if (di) di.textContent = f.distance_km;
+    });
+
+    // Check announcement thresholds with interpolated distances
+    if (!_firstRender) _checkThresholds(_lastAllFlights);
+}
+
+setInterval(_interpTick, 150);
+
 /* ── WebSocket ── */
 function applyFlightData(allFlights, source) {
     const radius = parseFloat(document.getElementById('radiusSelect').value);
@@ -2852,6 +2918,7 @@ function applyFlightData(allFlights, source) {
         })();
     });
     _lastAllFlights = allFlights;
+    _updateInterpBases(allFlights);
     const flights = allFlights.filter(f => f.distance_km <= radius)
         .sort((a, b) => a.distance_km - b.distance_km);
     _runAnnouncements(allFlights);
