@@ -502,6 +502,17 @@
             line-height: 1; font-family: 'Courier New', monospace;
         }
         .bc-dist-unit { font-size: 14px; color: #475569; margin-left: 3px; }
+
+        /* ── Odometer rolling digit animation ── */
+        .od-wrap { display: inline-flex; align-items: flex-end; vertical-align: bottom; }
+        .od-col  { display: inline-block; overflow: hidden; height: 1em; width: 1ch; line-height: 1; }
+        .od-strip {
+            display: flex; flex-direction: column;
+            will-change: transform;
+            transition: transform 120ms cubic-bezier(.22,.61,.36,1);
+        }
+        .od-strip span { display: block; height: 1em; line-height: 1; text-align: center; }
+        .od-dot { display: inline-block; height: 1em; line-height: 1; }
         .bc-approach {
             font-size: 12px; font-weight: 700;
             padding: 4px 10px; border-radius: 8px;
@@ -2130,7 +2141,7 @@ function renderCompactCard(f) {
             <div class="compact-callsign">${f.callsign || f.id}</div>
             <div class="compact-type">${acModel || f.aircraft_code || '–'}${reg && reg !== f.callsign ? ' · ' + reg : ''}</div>
             <div class="compact-stats">
-                <span><span class="dist-interp">${f.distance_km}</span> km</span>
+                <span><span class="dist-interp">${_odHtml(f.distance_km)}</span> km</span>
                 <span>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') + ' ft' : '–'}</span>
                 <span>${f.ground_speed_kmh ? f.ground_speed_kmh + ' km/h' : '–'}</span>
             </div>
@@ -2202,7 +2213,7 @@ function renderBigCard(f, isNew) {
                 <div class="bc-airline">${airline || f.flight_number || ''}</div>
             </div>
             <div class="bc-dist-block">
-                <span class="bc-dist-num">${f.distance_km}</span><span class="bc-dist-unit">km</span>
+                <span class="bc-dist-num">${_odHtml(f.distance_km)}</span><span class="bc-dist-unit">km</span>
                 ${approachBadge}
             </div>
         </div>
@@ -2402,7 +2413,7 @@ function renderCard(f, isNew) {
                 </div>
                 <div>
                     <div class="live-label">Entfernung</div>
-                    <div class="live-value"><span class="dist-interp">${f.distance_km}</span> <span class="live-unit">km</span></div>
+                    <div class="live-value"><span class="dist-interp">${_odHtml(f.distance_km)}</span> <span class="live-unit">km</span></div>
                 </div>
                 <div style="grid-column:1/-1">
                     <div class="live-label">Steigrate</div>
@@ -2861,6 +2872,55 @@ function toggleMap() {
     if (show) { initMap(); if (_map) _map.invalidateSize(); updateMap(currentFlights); }
 }
 
+/* ── Odometer helpers ── */
+function _odSig(str) {
+    return str.split('').map(ch => ch === '.' ? '.' : 'N').join('');
+}
+function _odHtml(val) {
+    const str = parseFloat(val).toFixed(1);
+    const sig = _odSig(str);
+    let inner = '';
+    for (const ch of str) {
+        if (ch === '.') {
+            inner += '<span class="od-dot">.</span>';
+        } else {
+            const d = parseInt(ch, 10);
+            let rows = '';
+            for (let i = 0; i <= 9; i++) rows += `<span>${i}</span>`;
+            inner += `<span class="od-col"><span class="od-strip" style="transform:translateY(${-d}em)">${rows}</span></span>`;
+        }
+    }
+    return `<span class="od-wrap dist-od" data-od-sig="${sig}">${inner}</span>`;
+}
+function _odSet(el, val) {
+    if (!el) return;
+    const str = parseFloat(val).toFixed(1);
+    const sig = _odSig(str);
+    if (el.dataset.odSig !== sig) {
+        el.dataset.odSig = sig;
+        let inner = '';
+        for (const ch of str) {
+            if (ch === '.') {
+                inner += '<span class="od-dot">.</span>';
+            } else {
+                const d = parseInt(ch, 10);
+                let rows = '';
+                for (let i = 0; i <= 9; i++) rows += `<span>${i}</span>`;
+                inner += `<span class="od-col"><span class="od-strip" style="transform:translateY(${-d}em)">${rows}</span></span>`;
+            }
+        }
+        el.innerHTML = inner;
+        return;
+    }
+    const strips = el.querySelectorAll('.od-strip');
+    let si = 0;
+    for (const ch of str) {
+        if (ch === '.') continue;
+        if (strips[si]) strips[si].style.transform = `translateY(${-parseInt(ch, 10)}em)`;
+        si++;
+    }
+}
+
 /* ── Live distance interpolation ── */
 // Stores the anchor state captured at each server push
 const _interpBases = new Map();
@@ -2906,14 +2966,11 @@ function _interpTick() {
         f.distance_km = parseFloat(_haversineDist(userLat, userLon, newLat, newLon).toFixed(1));
     });
 
-    // Update only the distance text nodes in each visible card
+    // Update odometer displays in each visible card
     currentFlights.forEach(f => {
         const card = document.getElementById(`card-${f.id}`);
         if (!card) return;
-        const bn = card.querySelector('.bc-dist-num');
-        if (bn) bn.textContent = f.distance_km;
-        const di = card.querySelector('.dist-interp');
-        if (di) di.textContent = f.distance_km;
+        card.querySelectorAll('.dist-od').forEach(el => _odSet(el, f.distance_km));
     });
 
     // Check announcement thresholds with interpolated distances
