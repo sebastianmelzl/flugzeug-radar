@@ -2594,11 +2594,11 @@ function renderBalconyRadar() {
         // Heading line
         if (f.heading != null) {
             const hr = f.heading * Math.PI / 180;
-            s += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px + Math.sin(hr) * 9).toFixed(1)}" y2="${(py - Math.cos(hr) * 9).toFixed(1)}" stroke="${color}" stroke-width="1.5" opacity="0.75"/>`;
+            s += `<line id="brh-${f.id}" x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(px + Math.sin(hr) * 9).toFixed(1)}" y2="${(py - Math.cos(hr) * 9).toFixed(1)}" stroke="${color}" stroke-width="1.5" opacity="0.75"/>`;
         }
 
         const label = f.callsign || f.id || '';
-        s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${color}" opacity="0.92"><title>${label} · ${distKm.toFixed(1)}km${f.destination_airport_iata ? ' → ' + f.destination_airport_iata : ''}</title></circle>`;
+        s += `<circle id="brd-${f.id}" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${color}" opacity="0.92"><title>${label} · ${distKm.toFixed(1)}km${f.destination_airport_iata ? ' → ' + f.destination_airport_iata : ''}</title></circle>`;
     });
 
     // User dot (drawn last, on top)
@@ -2607,6 +2607,31 @@ function renderBalconyRadar() {
 
     // Clip to circle
     svg.innerHTML = `<defs><clipPath id="radarClip"><circle cx="${cx}" cy="${cy}" r="${maxR}"/></clipPath></defs><g clip-path="url(#radarClip)">${s}</g>`;
+}
+
+function _updateBalconyRadar() {
+    const cx = 109, cy = 109, maxKm = 25, scale = 100 / maxKm;
+    const cosLat = Math.cos(userLat * Math.PI / 180);
+    (_lastAllFlights || []).forEach(f => {
+        const b = _interpBases.get(f.id);
+        if (!b || b._iLat == null) return;
+        const dLat = b._iLat - userLat;
+        const dLon = (b._iLon - userLon) * cosLat;
+        const distKm = Math.sqrt(dLat * dLat + dLon * dLon) * 111;
+        if (distKm > maxKm) return;
+        const bearing = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+        const px = cx + Math.sin(bearing * Math.PI / 180) * distKm * scale;
+        const py = cy - Math.cos(bearing * Math.PI / 180) * distKm * scale;
+        const dot = document.getElementById(`brd-${f.id}`);
+        if (dot) { dot.setAttribute('cx', px.toFixed(1)); dot.setAttribute('cy', py.toFixed(1)); }
+        const hdg = document.getElementById(`brh-${f.id}`);
+        if (hdg && b.heading != null) {
+            const hr = b.heading * Math.PI / 180;
+            hdg.setAttribute('x1', px.toFixed(1)); hdg.setAttribute('y1', py.toFixed(1));
+            hdg.setAttribute('x2', (px + Math.sin(hr) * 9).toFixed(1));
+            hdg.setAttribute('y2', (py - Math.cos(hr) * 9).toFixed(1));
+        }
+    });
 }
 
 function renderFlights(flights, source) {
@@ -3003,6 +3028,9 @@ function _interpTick() {
             if (card) card.querySelectorAll('.dist-od').forEach(el => _odSet(el, f.distance_km));
         }
     });
+
+    // Balcony radar — 60 fps
+    _updateBalconyRadar();
 
     if (doOd) _lastOdUpdate = now;
     if (doThresh) { _lastThresholdCheck = now; _checkThresholds(_lastAllFlights); }
