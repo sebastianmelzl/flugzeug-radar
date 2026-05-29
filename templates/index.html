@@ -2120,10 +2120,10 @@ function radarSVG(f, sz) {
       <text x="${cx}" y="${cy+maxR+10}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">S</text>
       <text x="${cx+maxR+7}" y="${cy+3}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">O</text>
       <text x="${cx-maxR-7}" y="${cy+3}" text-anchor="middle" fill="#243855" font-size="8" font-family="monospace">W</text>
-      <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#00d4aa" stroke-width=".8" stroke-dasharray="3,3" opacity=".4"/>
+      <line id="rln-${f.id}" x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#00d4aa" stroke-width=".8" stroke-dasharray="3,3" opacity=".4"/>
       <circle cx="${cx}" cy="${cy}" r="4" fill="#00d4aa" opacity=".85"/>
       <circle cx="${cx}" cy="${cy}" r="2" fill="#060911"/>
-      <g transform="translate(${px},${py}) rotate(${h})">
+      <g id="rpl-${f.id}" transform="translate(${px},${py}) rotate(${h})">
         <rect x="-1.8" y="-7.5" width="3.6" height="15" rx="1.8" fill="#00d4aa"/>
         <rect x="-7.5" y="-2" width="15" height="3.2" rx="1.5" fill="#00d4aa"/>
         <rect x="-3.5" y="5" width="7" height="2.2" rx="1" fill="#00d4aa"/>
@@ -2948,36 +2948,67 @@ function _haversineDist(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+let _lastOdUpdate = 0;
+let _lastThresholdCheck = 0;
+const _CX = 59, _CY = 59, _MAXR = 50;
+
 function _interpTick() {
+    requestAnimationFrame(_interpTick);
     if (!_lastAllFlights || !_lastAllFlights.length) return;
     const now = Date.now();
+    const doOd = now - _lastOdUpdate >= 120;
+    const doThresh = !_firstRender && now - _lastThresholdCheck >= 150;
+    const radiusKm = parseFloat(document.getElementById('radiusSelect').value);
 
-    // Dead-reckon each flight and update f.distance_km in-place
+    // Dead-reckon each flight — store interpolated lat/lon on the base entry
     _lastAllFlights.forEach(f => {
         const b = _interpBases.get(f.id);
         if (!b) return;
         const elapsed = (now - b.baseTs) / 1000;
-        if (elapsed < 0.05) return;
+        if (elapsed < 0.016) return;
         const moved_km = b.speed_kmh * elapsed / 3600;
         const hr = b.heading * Math.PI / 180;
         const cosLat = Math.cos(b.baseLat * Math.PI / 180) || 0.001;
-        const newLat = b.baseLat + moved_km * Math.cos(hr) / 111.32;
-        const newLon = b.baseLon + moved_km * Math.sin(hr) / (111.32 * cosLat);
-        f.distance_km = parseFloat(_haversineDist(userLat, userLon, newLat, newLon).toFixed(1));
+        b._iLat = b.baseLat + moved_km * Math.cos(hr) / 111.32;
+        b._iLon = b.baseLon + moved_km * Math.sin(hr) / (111.32 * cosLat);
+        f.distance_km = parseFloat(_haversineDist(userLat, userLon, b._iLat, b._iLon).toFixed(1));
     });
 
-    // Update odometer displays in each visible card
+    // Update visible cards at full frame rate (radar) or throttled (odometer)
     currentFlights.forEach(f => {
-        const card = document.getElementById(`card-${f.id}`);
-        if (!card) return;
-        card.querySelectorAll('.dist-od').forEach(el => _odSet(el, f.distance_km));
+        const b = _interpBases.get(f.id);
+
+        // Radar position — 60 fps
+        if (b && b._iLat != null) {
+            const g  = document.getElementById(`rpl-${f.id}`);
+            const ln = document.getElementById(`rln-${f.id}`);
+            if (g || ln) {
+                const dLon = (b._iLon - userLon) * Math.PI / 180;
+                const φ1 = userLat * Math.PI / 180, φ2 = b._iLat * Math.PI / 180;
+                const yb = Math.sin(dLon) * Math.cos(φ2);
+                const xb = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon);
+                const bearing = (Math.atan2(yb, xb) * 180 / Math.PI + 360) % 360;
+                const br = bearing * Math.PI / 180;
+                const dist = Math.min(f.distance_km / radiusKm, .92);
+                const px = (_CX + Math.sin(br) * dist * _MAXR).toFixed(2);
+                const py = (_CY - Math.cos(br) * dist * _MAXR).toFixed(2);
+                if (g)  g.setAttribute('transform', `translate(${px},${py}) rotate(${b.heading})`);
+                if (ln) { ln.setAttribute('x2', px); ln.setAttribute('y2', py); }
+            }
+        }
+
+        // Odometer — throttled to match CSS transition duration
+        if (doOd) {
+            const card = document.getElementById(`card-${f.id}`);
+            if (card) card.querySelectorAll('.dist-od').forEach(el => _odSet(el, f.distance_km));
+        }
     });
 
-    // Check announcement thresholds with interpolated distances
-    if (!_firstRender) _checkThresholds(_lastAllFlights);
+    if (doOd) _lastOdUpdate = now;
+    if (doThresh) { _lastThresholdCheck = now; _checkThresholds(_lastAllFlights); }
 }
 
-setInterval(_interpTick, 150);
+requestAnimationFrame(_interpTick);
 
 /* ── WebSocket ── */
 function applyFlightData(allFlights, source) {
