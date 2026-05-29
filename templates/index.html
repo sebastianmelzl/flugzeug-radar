@@ -2957,10 +2957,13 @@ function _updateInterpBases(allFlights) {
         if (f.latitude != null && f.longitude != null &&
             f.ground_speed_kmh > 0 && f.heading != null) {
             const prev = _interpBases.get(f.id);
-            // Re-anchor from current interpolated position to avoid snap on server push.
-            // Heading/speed always update from server so direction corrections still apply.
-            const baseLat = (prev && prev._iLat != null) ? prev._iLat : f.latitude;
-            const baseLon = (prev && prev._iLon != null) ? prev._iLon : f.longitude;
+            // If drift between interpolated pos and server pos is small, continue from
+            // interpolated pos (no snap). If large (sharp turn / GPS jump), snap to server.
+            let baseLat = f.latitude, baseLon = f.longitude;
+            if (prev && prev._iLat != null) {
+                const drift = _haversineDist(prev._iLat, prev._iLon, f.latitude, f.longitude);
+                if (drift < 2.0) { baseLat = prev._iLat; baseLon = prev._iLon; }
+            }
             _interpBases.set(f.id, {
                 baseLat, baseLon,
                 speed_kmh: f.ground_speed_kmh, heading: f.heading, baseTs: now
