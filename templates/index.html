@@ -2956,8 +2956,13 @@ function _updateInterpBases(allFlights) {
     allFlights.forEach(f => {
         if (f.latitude != null && f.longitude != null &&
             f.ground_speed_kmh > 0 && f.heading != null) {
+            const prev = _interpBases.get(f.id);
+            // Re-anchor from current interpolated position to avoid snap on server push.
+            // Heading/speed always update from server so direction corrections still apply.
+            const baseLat = (prev && prev._iLat != null) ? prev._iLat : f.latitude;
+            const baseLon = (prev && prev._iLon != null) ? prev._iLon : f.longitude;
             _interpBases.set(f.id, {
-                baseLat: f.latitude, baseLon: f.longitude,
+                baseLat, baseLon,
                 speed_kmh: f.ground_speed_kmh, heading: f.heading, baseTs: now
             });
         }
