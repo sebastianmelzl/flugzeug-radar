@@ -723,7 +723,7 @@
             .hdr-count { font-size: 17px; }
             .hdr-count-lbl { font-size: 10px; }
             .hdr-sep { display: none; }
-            .controls { flex: 0 0 auto; gap: 5px; flex-wrap: nowrap; }
+            .controls { flex: 0 0 auto; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
             #voiceSelect { display: none; }
             .meta { display: none; }
             .pulse { width: 7px; height: 7px; }
@@ -810,6 +810,7 @@
             .hdr-count-rwy18 ~ .hdr-count-lbl,
             .hdr-count-rwy18 { display: none; }
             .controls .map-btn:first-child { display: none; } /* Statistik verstecken */
+            .controls { width: 100%; }
         }
     </style>
 </head>
