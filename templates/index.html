@@ -878,6 +878,21 @@
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Patch L.Marker to use sub-pixel CSS transforms.
+// Leaflet's default update() calls latLngToLayerPoint().round() which forces
+// integer pixel positions — causing visible oscillation at 60fps with tiny moves.
+L.Marker.include({
+    update: function () {
+        if (this._icon && this._map) {
+            var pos = this._map.project(this._latlng)
+                          ._subtract(this._map.getPixelOrigin());
+            this._setPos(pos);  // no .round() — sub-pixel accurate
+        }
+        return this;
+    }
+});
+</script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const DEFAULT_LAT = {{ default_lat }};
@@ -893,7 +908,6 @@ let announcedBalcony  = new Set();
 let currentFlights = [];
 let _prevAnnouncementIds = new Set();
 let _map = null, _markers = {}, _markerSigs = {}, _destLines = {}, _selectedFlight = null, _selectedDestLL = null, _selectedDestIata = null, _destMarker = null, _tileLayer = null;
-let _mapMoving = false, _lastPushTs = 0, _markerTransMs = 7000;
 const _rwy18Stars = new Set(); // flight ids that should show a star (rwy18 + eastern dest)
 let _mapFirstUpdate = true;   // suppress rwy18 chime on initial data load
 let _balconyEnabled = localStorage.getItem('balconyEnabled') !== 'false';
@@ -2682,15 +2696,6 @@ function mapTileUrl() {
         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 }
 
-function _setMarkerTrans(m) {
-    const el = m.getElement ? m.getElement() : null;
-    if (el) el.style.transition = `transform ${_markerTransMs}ms linear`;
-}
-function _clearMarkerTrans(m) {
-    const el = m.getElement ? m.getElement() : null;
-    if (el) el.style.transition = 'none';
-}
-
 function initMap() {
     if (_map) return;
     _map = L.map('map', { zoomControl: true }).setView([DEFAULT_LAT, DEFAULT_LON], 10);
@@ -2698,16 +2703,6 @@ function initMap() {
     L.circleMarker([userLat, userLon], {
         radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
     }).addTo(_map).bindPopup('📍 Dein Standort');
-
-    // Disable CSS transitions during pan/zoom so markers don't lag behind
-    _map.on('movestart zoomstart', () => {
-        _mapMoving = true;
-        Object.values(_markers).forEach(_clearMarkerTrans);
-    });
-    _map.on('moveend zoomend', () => {
-        _mapMoving = false;
-        setTimeout(() => { if (!_mapMoving) Object.values(_markers).forEach(_setMarkerTrans); }, 50);
-    });
 }
 
 function isLargeAircraft(code) {
@@ -2799,7 +2794,7 @@ function updateMap(allFlights) {
 
         if (isCompact(f)) {
             if (_markers[f.id]) {
-                _markers[f.id].setLatLng([mLat, mLon]).setStyle({ color, fillColor: color });
+                _markers[f.id].setStyle({ color, fillColor: color });
             } else {
                 _markers[f.id] = L.circleMarker([mLat, mLon], {
                     radius: 5, color, fillColor: color, fillOpacity: 1, weight: 1.5
@@ -2809,33 +2804,22 @@ function updateMap(allFlights) {
             const sig = `${color}|${f.heading}|${hasStar}`;
             if (_markers[f.id]) {
                 if (_markerSigs[f.id] !== sig) {
-                    // setLatLng before setIcon so Leaflet places it correctly
-                    _markers[f.id].setLatLng([mLat, mLon])
-                        .setIcon(planeIcon(color, f.heading, false, f.aircraft_code, hasStar));
+                    _markers[f.id].setIcon(planeIcon(color, f.heading, false, f.aircraft_code, hasStar));
                     _markerSigs[f.id] = sig;
-                    // Re-apply transition after icon recreation (setIcon replaces the DOM element)
-                    setTimeout(() => { if (!_mapMoving) _setMarkerTrans(_markers[f.id]); }, 0);
-                } else {
-                    _markers[f.id].setLatLng([mLat, mLon]);
-                    if (!_mapMoving) _setMarkerTrans(_markers[f.id]);
                 }
+                // position owned by _interpTick at 60fps
             } else {
                 _markers[f.id] = L.marker([mLat, mLon], {
                     icon: planeIcon(color, f.heading, false, f.aircraft_code, hasStar)
                 }).addTo(_map).on('click', onMarkerClick);
                 _markerSigs[f.id] = sig;
-                // Apply transition one tick after creation so initial placement isn't animated
-                setTimeout(() => { if (!_mapMoving) _setMarkerTrans(_markers[f.id]); }, 50);
             }
         }
 
-        // Destination dashed line
+        // Destination dashed line — start point kept current by _interpTick
         if (destLL && f.latitude && f.longitude) {
-            const pts = [[mLat, mLon], destLL];
-            if (_destLines[f.id]) {
-                _destLines[f.id].setLatLngs(pts);
-            } else {
-                _destLines[f.id] = L.polyline(pts, {
+            if (!_destLines[f.id]) {
+                _destLines[f.id] = L.polyline([[mLat, mLon], destLL], {
                     color: '#94a3b8', weight: 1, opacity: 0.45, dashArray: '5 8'
                 }).addTo(_map);
             }
@@ -3085,6 +3069,21 @@ function _interpTick() {
     // Balcony radar — 60 fps
     _updateBalconyRadar();
 
+    // Leaflet map markers — 60 fps, sub-pixel via patched L.Marker.update
+    if (_map) {
+        _lastAllFlights.forEach(f => {
+            const b = _interpBases.get(f.id);
+            if (!b || b._iLat == null) return;
+            const m = _markers[f.id];
+            if (m) m.setLatLng([b._iLat, b._iLon]);
+            const dl = _destLines[f.id];
+            if (dl) {
+                const destLL = AP_LL[f.destination_airport_iata];
+                if (destLL) dl.setLatLngs([[b._iLat, b._iLon], destLL]);
+            }
+        });
+    }
+
     if (doOd) _lastOdUpdate = now;
     if (doThresh) { _lastThresholdCheck = now; _checkThresholds(_lastAllFlights); }
 }
@@ -3093,14 +3092,6 @@ requestAnimationFrame(_interpTick);
 
 /* ── WebSocket ── */
 function applyFlightData(allFlights, source) {
-    // Track push interval to tune CSS transition duration
-    const pushNow = Date.now();
-    if (_lastPushTs) {
-        const iv = pushNow - _lastPushTs;
-        if (iv > 1500 && iv < 20000) _markerTransMs = Math.round(iv * 0.92);
-    }
-    _lastPushTs = pushNow;
-
     const radius = parseFloat(document.getElementById('radiusSelect').value);
     allFlights.forEach(f => {
         f.distance_km = parseFloat(f.distance_km) || (() => {
