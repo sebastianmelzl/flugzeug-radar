@@ -1759,7 +1759,16 @@ async function speak(text, pauseSpotify = false, chimeType = null) {
 }
 
 async function _doSpeak(text, pauseSpotify, chimeType) {
-    if (pauseSpotify && IS_LOCAL) fetch('/api/spotify/pause', { method: 'POST' }).catch(() => {});
+    if (IS_LOCAL) {
+        // Local: server handles ducking, chime, TTS, and Spotify via afplay
+        await fetch('/api/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, voice: selectedVoice(), pause_spotify: pauseSpotify, chime_type: chimeType })
+        }).catch(() => {});
+        return;
+    }
+    // Remote (Railway): browser-based TTS chain
     if (chimeType === 'big')        await playChime();
     else if (chimeType === 'small') await playDing();
     try {
@@ -1773,7 +1782,6 @@ async function _doSpeak(text, pauseSpotify, chimeType) {
             await _playAudioBlob(blob);
         }
     } catch(e) { console.warn('[TTS]', e); }
-    if (pauseSpotify && IS_LOCAL) fetch('/api/spotify/resume', { method: 'POST' }).catch(() => {});
 }
 
 // Persistent <audio> element — pre-unlocked synchronously in gesture context for iOS
