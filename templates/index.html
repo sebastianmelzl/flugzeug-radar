@@ -3048,6 +3048,21 @@ function _interpTick() {
     // Balcony radar — 60 fps
     _updateBalconyRadar();
 
+    // Leaflet map markers — 60 fps
+    if (_map) {
+        _lastAllFlights.forEach(f => {
+            const b = _interpBases.get(f.id);
+            if (!b || b._iLat == null) return;
+            const m = _markers[f.id];
+            if (m) m.setLatLng([b._iLat, b._iLon]);
+            const dl = _destLines[f.id];
+            if (dl) {
+                const destLL = AP_LL[f.destination_airport_iata];
+                if (destLL) dl.setLatLngs([[b._iLat, b._iLon], destLL]);
+            }
+        });
+    }
+
     if (doOd) _lastOdUpdate = now;
     if (doThresh) { _lastThresholdCheck = now; _checkThresholds(_lastAllFlights); }
 }
