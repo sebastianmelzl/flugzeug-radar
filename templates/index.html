@@ -915,7 +915,7 @@ let _balconyEnabled = localStorage.getItem('balconyEnabled') !== 'false';
 
 function toggleBalconyAnnouncements() {
     _balconyEnabled = !_balconyEnabled;
-    localStorage.setItem('balconyEnabled', _balconyEnabled);
+    try { localStorage.setItem('balconyEnabled', _balconyEnabled); } catch(e) {}
     const btn = document.getElementById('balconyToggle');
     if (btn) btn.classList.toggle('active', _balconyEnabled);
 }
