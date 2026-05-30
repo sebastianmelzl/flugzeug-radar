@@ -892,7 +892,7 @@ let announcedOverhead = new Set();
 let announcedBalcony  = new Set();
 let currentFlights = [];
 let _prevAnnouncementIds = new Set();
-let _map = null, _markers = {}, _destLines = {}, _selectedFlight = null, _selectedDestLL = null, _selectedDestIata = null, _destMarker = null, _tileLayer = null;
+let _map = null, _markers = {}, _markerSigs = {}, _destLines = {}, _selectedFlight = null, _selectedDestLL = null, _selectedDestIata = null, _destMarker = null, _tileLayer = null;
 const _rwy18Stars = new Set(); // flight ids that should show a star (rwy18 + eastern dest)
 let _mapFirstUpdate = true;   // suppress rwy18 chime on initial data load
 let _balconyEnabled = localStorage.getItem('balconyEnabled') !== 'false';
@@ -2772,33 +2772,42 @@ function updateMap(allFlights) {
             }
         };
 
+        // Use interpolated anchor as position — avoids snap on server push
+        const _b = _interpBases.get(f.id);
+        const mLat = (_b && _b.baseLat != null) ? _b.baseLat : f.latitude;
+        const mLon = (_b && _b.baseLon != null) ? _b.baseLon : f.longitude;
+
         if (isCompact(f)) {
             // Glider / small aircraft: simple dot
             if (_markers[f.id]) {
-                _markers[f.id].setLatLng([f.latitude, f.longitude])
-                    .setStyle({ color, fillColor: color });
+                _markers[f.id].setStyle({ color, fillColor: color });
+                // position handled by _interpTick; only set on create
             } else {
-                _markers[f.id] = L.circleMarker([f.latitude, f.longitude], {
+                _markers[f.id] = L.circleMarker([mLat, mLon], {
                     radius: 5, color, fillColor: color, fillOpacity: 1, weight: 1.5
                 }).addTo(_map).on('click', onMarkerClick);
             }
         } else {
-            const icon = planeIcon(color, f.heading, false, f.aircraft_code, hasStar);
+            // Only recreate icon when appearance actually changes
+            const sig = `${color}|${f.heading}|${hasStar}`;
             if (_markers[f.id]) {
-                _markers[f.id].setLatLng([f.latitude, f.longitude]).setIcon(icon);
+                if (_markerSigs[f.id] !== sig) {
+                    _markers[f.id].setIcon(planeIcon(color, f.heading, false, f.aircraft_code, hasStar));
+                    _markerSigs[f.id] = sig;
+                }
+                // position handled by _interpTick
             } else {
-                _markers[f.id] = L.marker([f.latitude, f.longitude], { icon })
-                    .addTo(_map).on('click', onMarkerClick);
+                _markers[f.id] = L.marker([mLat, mLon], {
+                    icon: planeIcon(color, f.heading, false, f.aircraft_code, hasStar)
+                }).addTo(_map).on('click', onMarkerClick);
+                _markerSigs[f.id] = sig;
             }
         }
 
-        // Destination dashed line
+        // Destination dashed line — position handled by _interpTick; only create/remove here
         if (destLL && f.latitude && f.longitude) {
-            const pts = [[f.latitude, f.longitude], destLL];
-            if (_destLines[f.id]) {
-                _destLines[f.id].setLatLngs(pts);
-            } else {
-                _destLines[f.id] = L.polyline(pts, {
+            if (!_destLines[f.id]) {
+                _destLines[f.id] = L.polyline([[mLat, mLon], destLL], {
                     color: '#94a3b8', weight: 1, opacity: 0.45, dashArray: '5 8'
                 }).addTo(_map);
             }
@@ -2808,7 +2817,7 @@ function updateMap(allFlights) {
     });
 
     Object.keys(_markers).forEach(id => {
-        if (!seen.has(id)) { _map.removeLayer(_markers[id]); delete _markers[id]; _rwy18Stars.delete(id); }
+        if (!seen.has(id)) { _map.removeLayer(_markers[id]); delete _markers[id]; delete _markerSigs[id]; _rwy18Stars.delete(id); }
     });
     Object.keys(_destLines).forEach(id => {
         if (!seen.has(id)) { _map.removeLayer(_destLines[id]); delete _destLines[id]; }
