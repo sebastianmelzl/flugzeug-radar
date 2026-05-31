@@ -2170,7 +2170,7 @@ function renderCompactCard(f) {
             <div class="compact-type">${acModel || f.aircraft_code || '–'}${reg && reg !== f.callsign ? ' · ' + reg : ''}</div>
             <div class="compact-stats">
                 <span><span class="dist-interp">${_odHtml(f.distance_km)}</span> km</span>
-                <span>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') + ' ft' : '–'}</span>
+                <span>${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de') + ' m' : '–'}</span>
                 <span>${f.ground_speed_kmh ? f.ground_speed_kmh + ' km/h' : '–'}</span>
             </div>
         </div>
@@ -2274,8 +2274,9 @@ function renderBigCard(f, isNew) {
 
         <div class="bc-stats-row">
             <div class="bc-stat-item">
-                <div class="bc-stat-val">${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') : '–'}</div>
-                <div class="bc-stat-lbl">ft Höhe</div>
+                <div class="bc-stat-val">${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de') : '–'}</div>
+                <div class="bc-stat-lbl">m Höhe</div>
+                ${f.altitude_ft ? `<div class="bc-stat-lbl" style="opacity:.4">${Math.round(f.altitude_ft).toLocaleString('de')} ft</div>` : ''}
             </div>
             <div class="bc-stat-item">
                 <div class="bc-stat-val">${f.ground_speed_kmh || '–'}</div>
@@ -2427,7 +2428,7 @@ function renderCard(f, isNew) {
             <div class="live-grid">
                 <div>
                     <div class="live-label">Höhe</div>
-                    <div class="live-value">${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') : '–'} <span class="live-unit">ft</span></div>
+                    <div class="live-value">${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de') : '–'} <span class="live-unit">m</span>${f.altitude_ft ? ` <span class="live-unit" style="opacity:.4;font-size:.7em">${Math.round(f.altitude_ft).toLocaleString('de')} ft</span>` : ''}</div>
                     <div class="live-sub">${f.altitude_m ? Math.round(f.altitude_m).toLocaleString('de') + ' m' : ''}</div>
                 </div>
                 <div>
@@ -2781,7 +2782,7 @@ function updateMap(allFlights) {
             isMilitary(f) ? '#3b82f6' :
             isRwy18Departure(f) ? '#a855f7' :
             overhead ? '#f97316' : (inRadius && isLargeAircraft(f.aircraft_code)) ? '#ef4444' : inRadius ? '#00d4aa' : '#475569';
-        const popup = `<b>${f.callsign||f.id}</b><br>${f.airline_iata||f.airline_icao||'–'} · ${f.aircraft_code||'–'}<br>${f.origin_airport_iata||'?'} → ${f.destination_airport_iata||'?'}<br>${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de')+' ft' : '–'} · ${f.distance_km} km`;
+        const popup = `<b>${f.callsign||f.id}</b><br>${f.airline_iata||f.airline_icao||'–'} · ${f.aircraft_code||'–'}<br>${f.origin_airport_iata||'?'} → ${f.destination_airport_iata||'?'}<br>${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de')+' m' : '–'} · ${f.distance_km} km`;
 
         const onMarkerClick = () => {
             _selectedFlight = f.id;
@@ -3236,8 +3237,9 @@ function openInfoModal(flightId) {
         </div>
         <div class="info-modal-stats">
             <div class="info-modal-stat">
-                <div class="info-modal-stat-val">${f.altitude_ft ? Math.round(f.altitude_ft).toLocaleString('de') : '–'}</div>
-                <div class="info-modal-stat-lbl">ft Höhe</div>
+                <div class="info-modal-stat-val">${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de') : '–'}</div>
+                <div class="info-modal-stat-lbl">m Höhe</div>
+                ${f.altitude_ft ? `<div class="info-modal-stat-lbl" style="opacity:.4">${Math.round(f.altitude_ft).toLocaleString('de')} ft</div>` : ''}
             </div>
             <div class="info-modal-stat">
                 <div class="info-modal-stat-val">${f.ground_speed_kmh || '–'}</div>
