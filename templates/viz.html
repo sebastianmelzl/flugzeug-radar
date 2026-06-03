@@ -3,166 +3,124 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flugzeug Radar – Daten-Visualisierung</title>
+<title>Flugzeug Radar – Live Visualisierung</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-
 :root{
-    --teal:#00d4aa;--orange:#f97316;--purple:#a855f7;--blue:#3b82f6;
-    --bg:#020810;--card:rgba(13,21,40,.75);--border:#1a3050;
-    --text:#e2e8f0;--muted:#475569;--dim:#1e3a5f;
+  --teal:#00d4aa;--orange:#f97316;--purple:#a855f7;--blue:#3b82f6;
+  --bg:#020810;--card:rgba(10,18,36,.82);--border:rgba(30,58,95,.7);
+  --text:#e2e8f0;--muted:#475569;
 }
-
 html{scroll-behavior:smooth}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
 
+/* ── Starfield ── */
 #stars{position:fixed;inset:0;pointer-events:none;z-index:0}
-
 .page{position:relative;z-index:1}
 
 /* ── Header ── */
 header{
-    background:rgba(2,8,16,.85);backdrop-filter:blur(24px);
-    border-bottom:1px solid var(--border);
-    padding:14px 32px;display:flex;align-items:center;justify-content:space-between;
-    position:sticky;top:0;z-index:100;
+  background:rgba(2,8,16,.9);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+  padding:13px 32px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;
 }
-.logo{font-size:16px;font-weight:800;color:var(--teal);letter-spacing:-.01em}
-.nav{display:flex;gap:10px}
-.nav a{
-    color:var(--muted);text-decoration:none;font-size:12px;
-    padding:6px 14px;border-radius:8px;border:1px solid transparent;transition:all .15s;
-}
+.logo{font-size:15px;font-weight:800;color:var(--teal);letter-spacing:-.01em}
+.nav{display:flex;gap:8px}
+.nav a{color:var(--muted);text-decoration:none;font-size:12px;padding:5px 13px;
+  border-radius:8px;border:1px solid transparent;transition:all .15s}
 .nav a:hover{border-color:var(--teal);color:var(--teal)}
 
 /* ── Hero ── */
-.hero{
-    min-height:90vh;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    padding:80px 32px 60px;text-align:center;
+.hero{position:relative;min-height:88vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;padding:80px 24px 60px}
+#heroCanvas{position:absolute;inset:0;pointer-events:none}
+.hero-content{position:relative;text-align:center;z-index:2}
+.hero-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.3em;color:var(--muted);
+  margin-bottom:18px;opacity:0;animation:fu .6s .2s forwards}
+.hero-num{
+  font-size:clamp(80px,16vw,160px);font-weight:900;line-height:1;
+  color:var(--teal);font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+  text-shadow:0 0 80px rgba(0,212,170,.3),0 0 200px rgba(0,212,170,.1);
+  opacity:0;animation:fu .9s .35s forwards;
 }
-.hero-eyebrow{
-    font-size:11px;text-transform:uppercase;letter-spacing:.3em;color:var(--muted);
-    margin-bottom:20px;opacity:0;animation:fadeUp .6s .3s forwards;
-}
-#heroNum{
-    font-size:clamp(72px,14vw,152px);font-weight:900;line-height:1;
-    color:var(--teal);font-variant-numeric:tabular-nums;letter-spacing:-.03em;
-    text-shadow:0 0 80px rgba(0,212,170,.25),0 0 200px rgba(0,212,170,.08);
-    opacity:0;animation:fadeUp .9s .4s forwards;
-}
-.hero-unit{
-    font-size:clamp(18px,3vw,32px);font-weight:300;color:rgba(0,212,170,.5);
-    margin-left:8px;vertical-align:middle;
-}
-.hero-sub{
-    font-size:15px;color:var(--muted);margin-top:16px;
-    opacity:0;animation:fadeUp .6s .7s forwards;
-}
-.pills{
-    display:flex;gap:14px;margin-top:56px;flex-wrap:wrap;justify-content:center;
-}
+.hero-sub{font-size:14px;color:var(--muted);margin-top:14px;opacity:0;animation:fu .6s .6s forwards}
+.pills{display:flex;gap:12px;margin-top:52px;flex-wrap:wrap;justify-content:center}
 .pill{
-    background:rgba(13,21,40,.9);backdrop-filter:blur(20px);
-    border:1px solid var(--border);border-radius:18px;padding:18px 26px;min-width:150px;
-    opacity:0;transform:translateY(16px);
+  background:rgba(10,18,36,.92);backdrop-filter:blur(20px);
+  border:1px solid var(--border);border-radius:18px;padding:16px 24px;min-width:140px;
+  opacity:0;transform:translateY(14px);cursor:default;
+  transition:border-color .2s,box-shadow .2s;
 }
-.pill:nth-child(1){animation:fadeUp .5s .9s forwards}
-.pill:nth-child(2){animation:fadeUp .5s 1.05s forwards}
-.pill:nth-child(3){animation:fadeUp .5s 1.2s forwards}
-.pill:nth-child(4){animation:fadeUp .5s 1.35s forwards}
-.pill-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:8px}
-.pill-val{font-size:clamp(20px,3.5vw,28px);font-weight:800;color:var(--teal);line-height:1}
-.pill-val.ora{color:var(--orange)}
-.pill-val.sm{font-size:clamp(14px,2.5vw,18px);padding-top:4px}
-.pill-hint{font-size:10px;color:var(--muted);margin-top:5px}
+.pill:hover{border-color:rgba(0,212,170,.4);box-shadow:0 0 24px rgba(0,212,170,.08)}
+.pill:nth-child(1){animation:fu .5s .85s forwards}
+.pill:nth-child(2){animation:fu .5s 1s forwards}
+.pill:nth-child(3){animation:fu .5s 1.15s forwards}
+.pill:nth-child(4){animation:fu .5s 1.3s forwards}
+.pill-l{font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:7px}
+.pill-v{font-size:clamp(18px,3vw,26px);font-weight:800;color:var(--teal);line-height:1}
+.pill-v.ora{color:var(--orange)}.pill-v.sm{font-size:clamp(13px,2vw,17px);padding-top:3px}
+.pill-h{font-size:10px;color:var(--muted);margin-top:4px}
+@keyframes fu{to{opacity:1;transform:translateY(0)}}
 
-@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
-
-/* ── Section chrome ── */
-section{padding:72px 32px;max-width:1280px;margin:0 auto}
-.sec-eye{font-size:10px;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:10px}
-.sec-title{
-    font-size:clamp(26px,4vw,46px);font-weight:800;line-height:1.1;margin-bottom:48px;
-}
+/* ── Section ── */
+section{padding:80px 32px;max-width:1320px;margin:0 auto}
+.sec-eye{font-size:9px;text-transform:uppercase;letter-spacing:.25em;color:var(--muted);margin-bottom:10px}
+.sec-title{font-size:clamp(24px,4vw,44px);font-weight:800;line-height:1.1;margin-bottom:48px}
 .sec-title em{color:var(--teal);font-style:normal}
 
-/* ── Glass card ── */
-.glass{
-    background:var(--card);backdrop-filter:blur(20px);
-    border:1px solid var(--border);border-radius:22px;padding:36px;
-}
+/* ── Glass ── */
+.glass{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:22px;padding:36px}
 
-/* ── Radial clock ── */
-.radial-row{display:flex;align-items:center;gap:56px;flex-wrap:wrap}
-#radialClock{width:min(340px,90vw);height:min(340px,90vw);flex-shrink:0;filter:drop-shadow(0 0 48px rgba(0,212,170,.12))}
-.radial-meta{flex:1;min-width:220px}
-.peak-hour-big{font-size:clamp(48px,8vw,80px);font-weight:900;color:var(--orange);line-height:1;
-    text-shadow:0 0 40px rgba(249,115,22,.35)}
-.peak-desc{font-size:13px;color:var(--muted);margin-top:8px;margin-bottom:32px}
-.hour-rows{display:flex;flex-direction:column;gap:8px}
-.hour-row{display:flex;align-items:center;gap:10px;font-size:12px}
-.hour-lbl{color:var(--muted);width:38px;font-family:monospace;flex-shrink:0}
-.hour-track{flex:1;height:5px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
-.hour-fill{height:100%;border-radius:3px;width:0;transition:width 1s cubic-bezier(.22,.61,.36,1)}
-.hour-n{color:var(--muted);width:28px;text-align:right;font-family:monospace;flex-shrink:0}
-
-/* ── Top lists ── */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:780px){.two-col{grid-template-columns:1fr}}
-.list-title{font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:var(--muted);margin-bottom:24px}
-.top-item{
-    display:flex;align-items:center;gap:10px;margin-bottom:13px;
-    opacity:0;transform:translateX(-18px);
+/* ── Globe section ── */
+.globe-layout{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
+@media(max-width:900px){.globe-layout{grid-template-columns:1fr}}
+#globeSvg{width:100%;max-width:580px;margin:0 auto;display:block;cursor:grab}
+#globeSvg:active{cursor:grabbing}
+.route-list{display:flex;flex-direction:column;gap:10px}
+.route-item{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:rgba(255,255,255,.03);border:1px solid transparent;
+  border-radius:12px;cursor:pointer;transition:all .2s;opacity:0;transform:translateX(20px);
 }
-.t-rank{font-size:11px;font-weight:700;width:20px;text-align:right;flex-shrink:0;color:rgba(255,255,255,.15)}
-.t-rank.g{color:#f59e0b}.t-rank.s{color:#94a3b8}.t-rank.b{color:#b45309}
-.t-lbl{font-size:13px;color:var(--text);min-width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
-.t-track{flex:1;height:6px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
-.t-bar{height:100%;border-radius:3px;width:0;transition:width 1s cubic-bezier(.22,.61,.36,1)}
-.t-bar.te{background:linear-gradient(90deg,#00957a,var(--teal))}
-.t-bar.pu{background:linear-gradient(90deg,#6d28d9,var(--purple))}
-.t-n{font-size:13px;font-weight:700;color:var(--text);width:34px;text-align:right;font-family:monospace;flex-shrink:0}
+.route-item:hover{border-color:rgba(0,212,170,.3);background:rgba(0,212,170,.05)}
+.route-item.active{border-color:var(--teal);background:rgba(0,212,170,.08)}
+.ri-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ri-route{font-size:13px;font-weight:700;color:var(--text);font-family:monospace;flex:1}
+.ri-count{font-size:12px;color:var(--muted);font-family:monospace}
+.ri-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.ri-bar{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.22,.61,.36,1)}
+.globe-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;opacity:.6}
+
+/* ── Fleet bubbles ── */
+#fleetSvg{display:block;width:100%}
+.bubble-label{pointer-events:none;text-anchor:middle;dominant-baseline:central;font-family:'Segoe UI',system-ui,sans-serif}
+.fleet-tooltip{
+  position:absolute;pointer-events:none;
+  background:rgba(10,18,36,.95);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:14px;padding:14px 18px;
+  font-size:13px;opacity:0;transition:opacity .15s;min-width:160px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.ft-name{font-size:16px;font-weight:800;color:var(--teal);margin-bottom:4px}
+.ft-count{color:var(--muted)}
+.ft-family{font-size:11px;color:var(--muted);margin-top:3px}
 
 /* ── Heatmap ── */
-#heatGrid{display:grid;grid-template-columns:28px repeat(24,1fr);gap:3px}
-.hm-h{font-size:9px;color:var(--muted);text-align:center;font-family:monospace;padding-bottom:2px}
+#hmGrid{display:grid;grid-template-columns:28px repeat(24,1fr);gap:3px}
+.hm-h{font-size:9px;color:var(--muted);text-align:center;font-family:monospace}
 .hm-d{font-size:10px;color:var(--muted);display:flex;align-items:center;justify-content:flex-end;padding-right:4px}
-.hm-cell{
-    aspect-ratio:1;border-radius:4px;cursor:default;
-    opacity:0;transform:scale(.2);transition:transform .1s;
-}
-.hm-cell.vis{transition:opacity .45s,transform .5s cubic-bezier(.34,1.56,.64,1)}
-.hm-cell:hover{transform:scale(1.2)!important;outline:1px solid var(--teal);z-index:2;position:relative}
+.hm-c{aspect-ratio:1;border-radius:4px;opacity:0;transform:scale(.15);cursor:default;transition:transform .1s}
+.hm-c.vis{opacity:1!important;transform:scale(1)!important;transition:opacity .4s,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.hm-c:hover{transform:scale(1.2)!important;outline:1px solid var(--teal);position:relative;z-index:2}
 
 /* ── Area chart ── */
-#areaWrap{width:100%;overflow:hidden}
 #areaSvg{display:block;width:100%;overflow:visible}
 
-/* ── Weekday radial ── */
-#wdRing{width:min(260px,80vw);height:min(260px,80vw);margin:0 auto;display:block}
-
-/* ── Route bubbles ── */
-#routeBubbles{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:8px 0}
-.rb{
-    border-radius:50%;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.25);
-    display:flex;align-items:center;justify-content:center;flex-direction:column;
-    cursor:default;transition:transform .15s,box-shadow .15s;
-    text-align:center;padding:8px;
-    opacity:0;transform:scale(.3);
-}
-.rb:hover{transform:scale(1.08)!important;box-shadow:0 0 24px rgba(0,212,170,.2)}
-.rb-route{font-size:clamp(10px,1.5vw,13px);font-weight:700;color:var(--teal);white-space:nowrap}
-.rb-n{font-size:clamp(9px,1.2vw,11px);color:var(--muted);margin-top:2px}
-
-/* ── Divider + footer ── */
-.footer{padding:48px 32px;display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap}
-.footer a{
-    color:var(--muted);text-decoration:none;font-size:13px;
-    border:1px solid var(--border);padding:10px 22px;border-radius:11px;transition:all .15s;
-}
-.footer a:hover{border-color:var(--teal);color:var(--teal)}
-.footer a.prim{color:var(--teal);border-color:var(--dim)}
+/* ── Footer ── */
+.foot{padding:48px 32px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;border-top:1px solid var(--border)}
+.foot a{color:var(--muted);text-decoration:none;font-size:13px;border:1px solid var(--border);padding:10px 22px;border-radius:11px;transition:all .15s}
+.foot a:hover,.foot a.p{color:var(--teal);border-color:rgba(0,212,170,.3)}
 </style>
 </head>
 <body>
@@ -170,620 +128,655 @@ section{padding:72px 32px;max-width:1280px;margin:0 auto}
 <div class="page">
 
 <header>
-    <div class="logo">✈ Radar Insights</div>
-    <nav class="nav">
-        <a href="/">← Radar</a>
-        <a href="/stats">Tabellen</a>
-    </nav>
+  <div class="logo">✈ Radar Insights</div>
+  <nav class="nav">
+    <a href="/">← Radar</a>
+    <a href="/stats">Tabellen</a>
+  </nav>
 </header>
 
 <!-- HERO -->
 <div class="hero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="hero-content">
     <div class="hero-eyebrow">Flugzeuge über meinem Standort</div>
-    <div>
-        <span id="heroNum">0</span>
-    </div>
+    <div class="hero-num" id="heroNum">0</div>
     <div class="hero-sub" id="heroSub">wird geladen …</div>
     <div class="pills">
-        <div class="pill">
-            <div class="pill-lbl">Heute</div>
-            <div class="pill-val" id="pToday">–</div>
-            <div class="pill-hint">Überflüge</div>
-        </div>
-        <div class="pill">
-            <div class="pill-lbl">Peak-Stunde</div>
-            <div class="pill-val ora" id="pPeak">–</div>
-            <div class="pill-hint" id="pPeakH"></div>
-        </div>
-        <div class="pill">
-            <div class="pill-lbl">Top Airline</div>
-            <div class="pill-val sm" id="pAirline">–</div>
-            <div class="pill-hint" id="pAirlineH"></div>
-        </div>
-        <div class="pill">
-            <div class="pill-lbl">Top Modell</div>
-            <div class="pill-val sm" id="pAc">–</div>
-            <div class="pill-hint" id="pAcH"></div>
-        </div>
+      <div class="pill"><div class="pill-l">Heute</div><div class="pill-v" id="pToday">–</div><div class="pill-h">Überflüge</div></div>
+      <div class="pill"><div class="pill-l">Peak-Stunde</div><div class="pill-v ora" id="pPeak">–</div><div class="pill-h" id="pPeakH"></div></div>
+      <div class="pill"><div class="pill-l">Top Airline</div><div class="pill-v sm" id="pAirline">–</div><div class="pill-h" id="pAirH"></div></div>
+      <div class="pill"><div class="pill-l">Top Modell</div><div class="pill-v sm" id="pAc">–</div><div class="pill-h" id="pAcH"></div></div>
     </div>
+  </div>
 </div>
 
-<!-- RADIAL CLOCK -->
+<!-- GLOBE -->
 <section>
-    <div class="sec-eye">Zeitanalyse</div>
-    <div class="sec-title">Wann fliegen die meisten<br>Flugzeuge <em>über mich</em>?</div>
-    <div class="glass">
-        <div class="radial-row">
-            <svg id="radialClock" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg"></svg>
-            <div class="radial-meta">
-                <div class="peak-hour-big" id="peakBig">–</div>
-                <div class="peak-desc" id="peakDesc">–</div>
-                <div class="hour-rows" id="hourRows"></div>
-            </div>
-        </div>
+  <div class="sec-eye">Routen-Analyse</div>
+  <div class="sec-title">Wohin fliegen die Flugzeuge —<br><em>live auf dem Globus</em></div>
+  <div class="globe-layout">
+    <div class="glass" style="padding:24px">
+      <svg id="globeSvg" viewBox="0 0 560 560">
+        <defs>
+          <radialGradient id="atmoGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="88%" stop-color="#020d18"/>
+            <stop offset="96%" stop-color="#003d2e" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#00d4aa" stop-opacity=".12"/>
+          </radialGradient>
+          <radialGradient id="sphereGrad" cx="38%" cy="32%" r="65%">
+            <stop offset="0%" stop-color="#0a1e38"/>
+            <stop offset="100%" stop-color="#020810"/>
+          </radialGradient>
+          <filter id="routeGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <clipPath id="sphereClip">
+            <circle cx="280" cy="280" r="242"/>
+          </clipPath>
+        </defs>
+        <!-- filled by JS -->
+      </svg>
+      <div class="globe-hint">⟳ Ziehen zum Drehen · Scroll zum Zoomen</div>
     </div>
+    <div class="glass" style="padding:24px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:18px">Top Routen</div>
+      <div class="route-list" id="routeList"></div>
+    </div>
+  </div>
 </section>
 
-<!-- TOP LISTS -->
+<!-- FLEET BUBBLES -->
 <section>
-    <div class="sec-eye">Ranglisten</div>
-    <div class="sec-title">Die häufigsten<br><em>Airlines &amp; Modelle</em></div>
-    <div class="two-col">
-        <div class="glass">
-            <div class="list-title">Top Airlines</div>
-            <div id="topAirlines"></div>
-        </div>
-        <div class="glass">
-            <div class="list-title">Top Flugzeugmodelle</div>
-            <div id="topAircraft"></div>
-        </div>
-    </div>
-</section>
-
-<!-- ROUTE BUBBLES -->
-<section>
-    <div class="sec-eye">Routen</div>
-    <div class="sec-title">Die häufigsten <em>Routen</em></div>
-    <div class="glass">
-        <div id="routeBubbles"></div>
-    </div>
+  <div class="sec-eye">Flotte</div>
+  <div class="sec-title">Welche Flugzeugtypen<br>fliegen <em>am häufigsten</em> über mich?</div>
+  <div class="glass" style="padding:24px;position:relative;min-height:500px" id="fleetWrap">
+    <svg id="fleetSvg"></svg>
+    <div class="fleet-tooltip" id="fleetTip"></div>
+  </div>
 </section>
 
 <!-- HEATMAP -->
 <section>
-    <div class="sec-eye">Aktivitätsmuster</div>
-    <div class="sec-title">An welchem Wochentag<br>und welcher Uhrzeit ist <em>viel los</em>?</div>
-    <div class="glass">
-        <div style="overflow-x:auto">
-            <div style="min-width:540px">
-                <div id="heatGrid"></div>
-                <div style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:11px;color:var(--muted)">
-                    <span>ruhig</span>
-                    <div style="flex:1;max-width:180px;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(0,80,60,.15),var(--teal))"></div>
-                    <span>viel Betrieb</span>
-                </div>
-            </div>
-        </div>
-    </div>
+  <div class="sec-eye">Aktivitätsmuster</div>
+  <div class="sec-title">Wochentag × Uhrzeit —<br><em>wann ist viel los?</em></div>
+  <div class="glass">
+    <div style="overflow-x:auto"><div style="min-width:520px">
+      <div id="hmGrid"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:11px;color:var(--muted)">
+        <span>ruhig</span>
+        <div style="flex:1;max-width:180px;height:7px;border-radius:4px;background:linear-gradient(90deg,rgba(0,60,40,.15),var(--teal))"></div>
+        <span>viel Betrieb</span>
+      </div>
+    </div></div>
+  </div>
 </section>
 
-<!-- 30-DAY TREND + WEEKDAY RING side by side -->
+<!-- 30 DAY TREND -->
 <section>
-    <div class="sec-eye">Verlauf</div>
-    <div class="sec-title">30-Tage-Trend &amp; <em>Wochenrhythmus</em></div>
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start">
-        <div class="glass">
-            <div id="areaWrap">
-                <svg id="areaSvg" height="210">
-                    <defs>
-                        <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stop-color="#00d4aa" stop-opacity=".28"/>
-                            <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
-                        </linearGradient>
-                        <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
-                            <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                        </filter>
-                    </defs>
-                </svg>
-            </div>
-        </div>
-        <div class="glass" style="display:flex;flex-direction:column;align-items:center;gap:16px">
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:var(--muted);align-self:flex-start">Wochentage</div>
-            <svg id="wdRing" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg"></svg>
-        </div>
-    </div>
+  <div class="sec-eye">30-Tage-Trend</div>
+  <div class="sec-title">Überflüge <em>pro Tag</em></div>
+  <div class="glass">
+    <svg id="areaSvg" height="220">
+      <defs>
+        <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#00d4aa" stop-opacity=".3"/>
+          <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+        </linearGradient>
+        <filter id="lGlow" x="-10%" y="-50%" width="120%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+    </svg>
+  </div>
 </section>
 
-<div style="border-top:1px solid var(--border);margin:0 32px"></div>
-<div class="footer">
-    <a href="/" class="prim">← Zurück zum Radar</a>
-    <a href="/stats">Statistik-Tabellen ↗</a>
+<div class="foot">
+  <a href="/" class="p">← Zurück zum Radar</a>
+  <a href="/stats">Statistik-Tabellen ↗</a>
 </div>
 </div><!-- .page -->
 
+<!-- D3 + TopoJSON from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson@3/dist/topojson.min.js"></script>
+
 <script>
-/* ═══════════════════════════════════════ LOOKUP TABLES ══════════════════════ */
-const AIRLINES={
-    LH:'Lufthansa',LX:'Swiss',OS:'Austrian',EW:'Eurowings','4U':'Eurowings','4Y':'Eurowings Disc.',
-    DE:'Condor',BQ:'Sundair',X3:'TUI fly DE',WK:'Edelweiss',EN:'Air Dolomiti',
-    BA:'British Airways',EI:'Aer Lingus',LS:'Jet2',BY:'TUI Airways',FR:'Ryanair',U2:'easyJet',
-    DY:'Norwegian',KL:'KLM',HV:'Transavia',SN:'Brussels Airlines',AF:'Air France',
-    IB:'Iberia',VY:'Vueling',AZ:'ITA Airways',TP:'TAP Portugal',SK:'SAS',AY:'Finnair',
-    TK:'Turkish Airlines',PC:'Pegasus',EK:'Emirates',FZ:'flydubai',EY:'Etihad',
-    QR:'Qatar Airways',SQ:'Singapore Airlines',CX:'Cathay Pacific',
-    AA:'American',UA:'United',DL:'Delta',AC:'Air Canada',W6:'Wizz Air',
-    DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian',CFG:'Condor',
-    RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',THY:'Turkish Airlines',PGT:'Pegasus',
-    UAE:'Emirates',ETD:'Etihad',QTR:'Qatar Airways',KLM:'KLM',TRA:'Transavia',
-    AFR:'Air France',BAW:'British Airways',EIN:'Aer Lingus',IBE:'Iberia',
-    TAP:'TAP Portugal',SAS:'SAS',FIN:'Finnair',LOT:'LOT Polish',
-    CLX:'Cargolux',GEC:'Lufthansa Cargo',NJE:'NetJets',
+/* ══════════════════════════ NAME LOOKUPS ══════════════════════════════════ */
+const AL={
+  LH:'Lufthansa',LX:'Swiss',OS:'Austrian',EW:'Eurowings','4U':'Eurowings','4Y':'Eurowings Disc.',
+  DE:'Condor',BQ:'Sundair',X3:'TUI fly',EN:'Air Dolomiti',WK:'Edelweiss',
+  BA:'British Airways',EI:'Aer Lingus',FR:'Ryanair',U2:'easyJet',DY:'Norwegian',LS:'Jet2',BY:'TUI Airways',
+  KL:'KLM',HV:'Transavia',SN:'Brussels Airlines',AF:'Air France',IB:'Iberia',VY:'Vueling',
+  AZ:'ITA Airways',TP:'TAP Portugal',SK:'SAS',AY:'Finnair',TK:'Turkish Airlines',PC:'Pegasus',
+  EK:'Emirates',FZ:'flydubai',EY:'Etihad',QR:'Qatar Airways',
+  SQ:'Singapore Airlines',CX:'Cathay Pacific',AA:'American',UA:'United',DL:'Delta',W6:'Wizz Air',
+  DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian',CFG:'Condor',
+  RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',THY:'Turkish Airlines',PGT:'Pegasus',
+  UAE:'Emirates',ETD:'Etihad',QTR:'Qatar Airlines',KLM:'KLM',TRA:'Transavia',
+  AFR:'Air France',BAW:'British Airways',EIN:'Aer Lingus',IBE:'Iberia',
+  TAP:'TAP Portugal',SAS:'SAS',FIN:'Finnair',CLX:'Cargolux',GEC:'LH Cargo',NJE:'NetJets',
 };
-const AIRCRAFT={
-    A20N:'A320neo',A21N:'A321neo',A19N:'A319neo',
-    A318:'A318',A319:'A319',A320:'A320',A321:'A321',
-    A332:'A330-200',A333:'A330-300',A359:'A350-900',A35K:'A350-1000',A388:'A380',
-    B737:'737-700',B738:'737-800',B739:'737-900',
-    B37M:'737 MAX 7',B38M:'737 MAX 8',B39M:'737 MAX 9',
-    B744:'747-400',B748:'747-8',B752:'757-200',B763:'767-300',
-    B772:'777-200',B773:'777-300',B77W:'777-300ER',
-    B788:'787-8',B789:'787-9',B78X:'787-10',
-    E170:'E170',E175:'E175',E190:'E190',E195:'E195',
-    CRJ2:'CRJ-200',CRJ7:'CRJ-700',CRJ9:'CRJ-900',
-    AT75:'ATR 72',AT76:'ATR 72-600',DH8D:'Q400',
+const AC={
+  A20N:'Airbus A320neo',A21N:'Airbus A321neo',A19N:'Airbus A319neo',
+  A318:'Airbus A318',A319:'Airbus A319',A320:'Airbus A320',A321:'Airbus A321',
+  A332:'Airbus A330-200',A333:'Airbus A330-300',
+  A359:'Airbus A350-900',A35K:'Airbus A350-1000',A388:'Airbus A380',
+  B737:'Boeing 737-700',B738:'Boeing 737-800',B739:'Boeing 737-900',
+  B37M:'Boeing 737 MAX 7',B38M:'Boeing 737 MAX 8',B39M:'Boeing 737 MAX 9',
+  B744:'Boeing 747-400',B748:'Boeing 747-8',B752:'Boeing 757-200',B763:'Boeing 767-300',
+  B772:'Boeing 777-200',B773:'Boeing 777-300',B77W:'Boeing 777-300ER',
+  B788:'Boeing 787-8',B789:'Boeing 787-9',B78X:'Boeing 787-10',
+  E170:'Embraer E170',E175:'Embraer E175',E190:'Embraer E190',E195:'Embraer E195',
+  CRJ2:'CRJ-200',CRJ7:'CRJ-700',CRJ9:'CRJ-900',
+  AT75:'ATR 72-500',AT76:'ATR 72-600',DH8D:'Dash 8 Q400',
+};
+const FAMILY={
+  A20N:'Airbus Narrow',A21N:'Airbus Narrow',A19N:'Airbus Narrow',A318:'Airbus Narrow',A319:'Airbus Narrow',A320:'Airbus Narrow',A321:'Airbus Narrow',
+  A332:'Airbus Wide',A333:'Airbus Wide',A359:'Airbus Wide',A35K:'Airbus Wide',A388:'Airbus Jumbo',
+  B737:'Boeing Narrow',B738:'Boeing Narrow',B739:'Boeing Narrow',B37M:'Boeing Narrow',B38M:'Boeing Narrow',B39M:'Boeing Narrow',
+  B744:'Boeing Jumbo',B748:'Boeing Jumbo',B752:'Boeing Narrow',B763:'Boeing Wide',
+  B772:'Boeing Wide',B773:'Boeing Wide',B77W:'Boeing Wide',B788:'Boeing Wide',B789:'Boeing Wide',B78X:'Boeing Wide',
+  E170:'Embraer',E175:'Embraer',E190:'Embraer',E195:'Embraer',
+  CRJ2:'Bombardier',CRJ7:'Bombardier',CRJ9:'Bombardier',
+  AT75:'Turboprop',AT76:'Turboprop',DH8D:'Turboprop',
+};
+const FCOLOR={'Airbus Narrow':'#00d4aa','Airbus Wide':'#0ea5e9','Airbus Jumbo':'#a855f7',
+  'Boeing Narrow':'#f97316','Boeing Wide':'#fb923c','Boeing Jumbo':'#ef4444',
+  'Embraer':'#22d3ee','Bombardier':'#34d399','Turboprop':'#94a3b8'};
+
+function alName(i,c){return AL[i]||AL[c]||i||c||'–'}
+function acName(c){return AC[c]||c||'–'}
+
+/* ══════════════════════════ AIRPORT COORDS [lon,lat] ═══════════════════════ */
+const AP={
+  FRA:[8.562,50.038],MUC:[11.786,48.354],BER:[13.503,52.367],HAM:[10.005,53.630],
+  DUS:[6.767,51.290],STR:[9.222,48.690],CGN:[7.143,50.866],NUE:[11.078,49.499],
+  LHR:[-0.461,51.477],LGW:[-0.190,51.148],LTN:[-0.368,51.874],STN:[0.235,51.885],
+  MAN:[-2.275,53.353],EDI:[-3.373,55.950],
+  CDG:[2.549,49.010],ORY:[2.379,48.724],
+  AMS:[4.764,52.309],BRU:[4.484,50.901],
+  FCO:[12.251,41.800],MXP:[8.723,45.630],LIN:[9.276,45.449],BGY:[9.704,45.669],NAP:[14.291,40.886],
+  ZRH:[8.549,47.465],GVA:[6.109,46.238],BSL:[7.530,47.590],
+  VIE:[16.570,48.110],SZG:[13.004,47.793],GRZ:[15.439,46.991],
+  LIS:[-9.135,38.774],OPO:[-8.681,41.248],
+  MAD:[-3.567,40.472],BCN:[2.170,41.297],PMI:[2.739,39.552],
+  CPH:[12.649,55.618],ARN:[17.919,59.652],OSL:[11.100,60.194],GOT:[12.280,57.663],HEL:[24.963,60.318],
+  WAW:[20.967,52.166],PRG:[14.263,50.101],BUD:[19.256,47.430],OTP:[26.085,44.572],SOF:[23.411,42.697],
+  IST:[28.814,40.977],SAW:[29.309,40.898],ADB:[27.157,38.292],AYT:[30.796,36.899],
+  TLV:[34.887,32.011],AMM:[35.993,31.723],CAI:[31.406,30.122],
+  DXB:[55.364,25.253],AUH:[54.651,24.433],DOH:[51.614,25.273],
+  HRG:[33.800,27.178],SSH:[37.736,27.977],
+  ATH:[23.944,37.936],SKG:[22.971,40.520],HER:[25.180,35.340],RHO:[28.086,36.405],
+  SIN:[103.992,1.350],HKG:[113.915,22.309],NRT:[140.386,35.765],ICN:[126.451,37.460],
+  PEK:[116.598,40.080],PVG:[121.808,31.144],
+  JFK:[-73.779,40.640],EWR:[-74.175,40.690],BOS:[-71.005,42.363],
+  LAX:[-118.408,33.943],ORD:[-87.905,41.974],MIA:[-80.291,25.796],
+  YYZ:[-79.631,43.677],YUL:[-73.740,45.457],
+  GRU:[-46.473,-23.436],EZE:[-58.536,-34.822],SCL:[-70.786,-33.393],BOG:[-74.149,4.702],
+  MEX:[-99.072,19.436],CUN:[-86.877,21.037],
+  SYD:[151.177,-33.946],MEL:[144.843,-37.669],
+  JNB:[28.246,-26.137],CPT:[18.600,-33.965],NBO:[36.925,-1.319],
+  ADD:[38.799,8.978],
 };
 
-function alName(i,c){return AIRLINES[i]||AIRLINES[c]||i||c||'–'}
-function acName(c){return AIRCRAFT[c]||c||'–'}
-
-/* ═══════════════════════════════════════ STARS CANVAS ═══════════════════════ */
+/* ══════════════════════════ STARFIELD ═══════════════════════════════════ */
 (function(){
-    const c=document.getElementById('stars'),ctx=c.getContext('2d');
-    let W,H,stars=[];
-    function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
-    function mkStars(){
-        stars=Array.from({length:220},()=>({
-            x:Math.random()*W,y:Math.random()*H,
-            r:Math.random()*.9+.15,
-            base:Math.random()*.18+.04,
-            phase:Math.random()*Math.PI*2,
-            spd:Math.random()*.015+.005,
-        }));
-    }
-    function draw(){
-        ctx.clearRect(0,0,W,H);
-        const t=Date.now()*.001;
-        stars.forEach(s=>{
-            const op=s.base*(0.6+0.4*Math.sin(s.phase+t*s.spd*40));
-            ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-            ctx.fillStyle=`rgba(180,215,255,${op.toFixed(3)})`;ctx.fill();
-        });
-        requestAnimationFrame(draw);
-    }
-    resize();mkStars();draw();
-    window.addEventListener('resize',()=>{resize();mkStars()});
+  const c=document.getElementById('stars'),ctx=c.getContext('2d');
+  let W,H,stars=[];
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
+  function mk(){stars=Array.from({length:240},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*.85+.1,base:Math.random()*.15+.03,ph:Math.random()*Math.PI*2,sp:Math.random()*.01+.003}))}
+  function draw(){
+    ctx.clearRect(0,0,W,H);const t=Date.now()*.001;
+    stars.forEach(s=>{
+      const op=s.base*(0.55+0.45*Math.sin(s.ph+t*s.sp*40));
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(180,215,255,${op.toFixed(3)})`;ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  resize();mk();draw();
+  window.addEventListener('resize',()=>{resize();mk()});
 })();
 
-/* ═══════════════════════════════════════ COUNTER ════════════════════════════ */
+/* ══════════════════════════ HERO CANVAS PLANES ══════════════════════════ */
+(function(){
+  const c=document.getElementById('heroCanvas');
+  const ctx=c.getContext('2d');
+  let W,H;
+  // simplified top-view plane silhouette draw fn
+  function drawPlane(ctx,x,y,scale,alpha,color){
+    ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+    ctx.globalAlpha=alpha;ctx.fillStyle=color;
+    // fuselage
+    ctx.beginPath();ctx.ellipse(0,0,4,22,0,0,Math.PI*2);ctx.fill();
+    // wings
+    ctx.beginPath();ctx.moveTo(0,-4);ctx.lineTo(30,6);ctx.lineTo(28,10);ctx.lineTo(0,4);ctx.lineTo(-28,10);ctx.lineTo(-30,6);ctx.closePath();ctx.fill();
+    // tail
+    ctx.beginPath();ctx.moveTo(0,15);ctx.lineTo(12,22);ctx.lineTo(11,25);ctx.lineTo(0,21);ctx.lineTo(-11,25);ctx.lineTo(-12,22);ctx.closePath();ctx.fill();
+    // engine pods
+    ctx.fillStyle=color==='#00d4aa'?'#007a63':color;
+    [[-18,2],[18,2]].forEach(([ex,ey])=>{ctx.beginPath();ctx.ellipse(ex,ey,4,2.5,0,0,Math.PI*2);ctx.fill()});
+    ctx.restore();
+  }
+  // Layers of planes at different depths
+  const layers=[
+    {speed:.4,scale:.7,alpha:.08,y:.25,color:'#00d4aa',offset:0},
+    {speed:.7,scale:1.1,alpha:.12,y:.45,color:'#3b82f6',offset:300},
+    {speed:1.2,scale:1.5,alpha:.18,y:.6,color:'#00d4aa',offset:600},
+    {speed:.5,scale:.5,alpha:.06,y:.3,color:'#a855f7',offset:900},
+    {speed:1.8,scale:2.0,alpha:.22,y:.72,color:'#f97316',offset:1200},
+    {speed:.9,scale:1.2,alpha:.14,y:.55,color:'#00d4aa',offset:200},
+  ];
+  function resize(){W=c.width=c.parentElement.clientWidth;H=c.height=c.parentElement.clientHeight}
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const t=Date.now()*.001;
+    layers.forEach(l=>{
+      const x=W+80-(t*l.speed*60+l.offset)%(W+160);
+      const y=H*l.y;
+      drawPlane(ctx,x,y,l.scale,l.alpha,l.color);
+    });
+    requestAnimationFrame(draw);
+  }
+  resize();draw();
+  window.addEventListener('resize',resize);
+})();
+
+/* ══════════════════════════ COUNTER ══════════════════════════════════════ */
 function countUp(el,target,dur=2000){
+  const t0=Date.now();const ease=t=>t<.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1;
+  function tick(){
+    const p=Math.min((Date.now()-t0)/dur,1);
+    el.textContent=Math.round(ease(p)*target).toLocaleString('de');
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ══════════════════════════ GLOBE ════════════════════════════════════════ */
+let _globeRoutes=[];
+function buildGlobe(routes){
+  _globeRoutes=routes;
+  const svg=d3.select('#globeSvg');
+  const W=560,H=560,R=242;
+  const cx=W/2,cy=H/2;
+
+  const proj=d3.geoOrthographic().scale(R).translate([cx,cy]).clipAngle(90).rotate([0,-25,0]);
+  const path=d3.geoPath().projection(proj);
+  const graticule=d3.geoGraticule().step([20,20]);
+
+  // Atmosphere halo
+  svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',R+12)
+    .attr('fill','none').attr('stroke','rgba(0,212,170,.08)').attr('stroke-width','12');
+  svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',R+4)
+    .attr('fill','none').attr('stroke','rgba(0,212,170,.04)').attr('stroke-width','6');
+
+  // Sphere
+  svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',R).attr('fill','url(#sphereGrad)');
+
+  // All geo layers inside clip
+  const g=svg.append('g').attr('clip-path','url(#sphereClip)');
+
+  const gratPath=g.append('path').datum(graticule()).attr('fill','none')
+    .attr('stroke','rgba(0,180,150,.07)').attr('stroke-width','.6');
+
+  const landPath=g.append('path').attr('fill','#081a30').attr('stroke','#0d2a48').attr('stroke-width','.4');
+
+  // Route arcs group
+  const arcG=g.append('g');
+  // Dot group (animated traveling dots)
+  const dotG=g.append('g');
+  // Airport markers
+  const aptG=g.append('g');
+
+  // Home marker (FRA area)
+  const homeG=g.append('g');
+
+  // Overlay for sphere edge gloss
+  svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',R)
+    .attr('fill','none').attr('stroke','rgba(0,212,170,.06)').attr('stroke-width','2');
+
+  // Build route geo features
+  const routeFeatures=routes.filter(r=>AP[r.origin_airport_iata]&&AP[r.destination_airport_iata]).map((r,i)=>{
+    const oc=AP[r.origin_airport_iata],dc=AP[r.destination_airport_iata];
+    return{
+      type:'Feature',
+      geometry:{type:'LineString',coordinates:[oc,dc]},
+      props:{...r,idx:i,interp:d3.geoInterpolate(oc,dc)}
+    };
+  });
+  const maxCount=Math.max(...routeFeatures.map(r=>r.props.count),1);
+  const colorScale=d3.scaleSequential(d3.interpolateRgb('#00d4aa','#f97316')).domain([0,routeFeatures.length-1]);
+
+  // Create arc paths
+  const arcPaths=arcG.selectAll('path').data(routeFeatures).enter()
+    .append('path')
+    .attr('fill','none')
+    .attr('stroke',(d,i)=>colorScale(i))
+    .attr('stroke-width',d=>Math.max(.8,1.8*(d.props.count/maxCount)))
+    .attr('stroke-opacity',.7)
+    .attr('filter','url(#routeGlow)')
+    .attr('d',d=>path(d.geometry));
+
+  // Traveling dots state
+  const dots=routeFeatures.slice(0,12).map((r,i)=>({
+    progress:Math.random(),
+    speed:0.0008+Math.random()*0.0006,
+    route:r,
+    color:colorScale(i),
+    el:dotG.append('circle').attr('r',3.5).attr('fill',colorScale(i)).attr('filter','url(#dotGlow)').attr('opacity',0),
+    trailEl:dotG.append('circle').attr('r',6).attr('fill',colorScale(i)).attr('opacity',0),
+  }));
+
+  // Airport markers for main airports
+  const mainApts=['FRA','MUC','LHR','CDG','AMS','IST','DXB','JFK','SIN'];
+  const aptDots=aptG.selectAll('circle').data(mainApts.filter(a=>AP[a])).enter()
+    .append('circle').attr('r',2.5)
+    .attr('fill','rgba(255,255,255,.7)').attr('stroke','none');
+
+  // Home marker
+  const homeDot=homeG.append('circle').attr('r',5).attr('fill','var(--teal)').attr('opacity',0);
+  const homeRing=homeG.append('circle').attr('r',5).attr('fill','none')
+    .attr('stroke','var(--teal)').attr('stroke-width',1.5).attr('opacity',0);
+
+  // Drag to rotate
+  let isDrag=false,dragRot=null,dragXY=null;
+  svg.call(d3.drag()
+    .on('start',e=>{isDrag=true;dragRot=[...proj.rotate()];dragXY=[e.x,e.y]})
+    .on('drag',e=>{
+      const dx=e.x-dragXY[0],dy=e.y-dragXY[1];
+      proj.rotate([dragRot[0]+dx*.35,Math.max(-75,Math.min(75,dragRot[1]-dy*.35)),dragRot[2]]);
+      redraw();
+    })
+    .on('end',()=>isDrag=false)
+  );
+
+  // Zoom
+  svg.on('wheel.zoom',e=>{
+    e.preventDefault();
+    const s=Math.max(100,Math.min(600,proj.scale()-e.deltaY*.5));
+    proj.scale(s);redraw();
+  },{passive:false});
+
+  let angle=0;
+
+  function redraw(){
+    gratPath.attr('d',path);
+    landPath.attr('d',path({type:'FeatureCollection',features:window._worldFeatures||[]}));
+    arcPaths.attr('d',d=>path(d.geometry));
+    aptDots.each(function(code){
+      const pp=proj(AP[code]);
+      if(pp){d3.select(this).attr('cx',pp[0]).attr('cy',pp[1]).attr('opacity',
+        d3.geoDistance(AP[code],[-proj.rotate()[0],-proj.rotate()[1]])<Math.PI/2?1:0)}
+    });
+    // home
+    const fra=AP['FRA'];if(fra){
+      const pp=proj(fra);
+      const vis=d3.geoDistance(fra,[-proj.rotate()[0],-proj.rotate()[1]])<Math.PI/2;
+      if(pp&&vis){homeDot.attr('cx',pp[0]).attr('cy',pp[1]).attr('opacity',.9);homeRing.attr('cx',pp[0]).attr('cy',pp[1]).attr('opacity',.5)}
+      else{homeDot.attr('opacity',0);homeRing.attr('opacity',0)}
+    }
+    // traveling dots
+    dots.forEach(dot=>{
+      dot.progress=(dot.progress+dot.speed)%1;
+      const geo=dot.route.props.interp(dot.progress);
+      const visible=d3.geoDistance(geo,[-proj.rotate()[0],-proj.rotate()[1]])<Math.PI/2;
+      const pp=proj(geo);
+      if(pp&&visible){
+        dot.el.attr('cx',pp[0]).attr('cy',pp[1]).attr('opacity',.95);
+        dot.trailEl.attr('cx',pp[0]).attr('cy',pp[1]).attr('opacity',.2);
+      }else{dot.el.attr('opacity',0);dot.trailEl.attr('opacity',0)}
+    });
+  }
+
+  // Load world topology
+  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(world=>{
+    const countries=topojson.feature(world,world.objects.countries);
+    window._worldFeatures=countries.features;
+    landPath.datum(countries).attr('d',path);
+    gratPath.attr('d',path);
+    // Animate route arcs in
+    arcPaths.attr('stroke-dasharray',function(){return this.getTotalLength()})
+      .attr('stroke-dashoffset',function(){return this.getTotalLength()})
+      .transition().duration(1800).delay((_,i)=>i*120)
+      .ease(d3.easeCubicOut)
+      .attr('stroke-dashoffset',0);
+  }).catch(()=>{});
+
+  // Animation loop
+  function frame(){
+    if(!isDrag){
+      angle+=.12;
+      const[,tilt,roll]=proj.rotate();
+      proj.rotate([angle,tilt,roll]);
+    }
+    redraw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Route list sidebar
+  const list=document.getElementById('routeList');
+  list.innerHTML=routes.slice(0,10).map((r,i)=>{
+    const col=colorScale(i);
+    const pct=Math.round(r.count/maxCount*100);
+    return`<div class="route-item" id="ri-${i}" onclick="highlightRoute(${i})">
+      <div class="ri-dot" style="background:${col}"></div>
+      <span class="ri-route">${r.origin_airport_iata||'?'} → ${r.destination_airport_iata||'?'}</span>
+      <div class="ri-bar-wrap"><div class="ri-bar" style="background:${col};width:0" data-p="${pct}"></div></div>
+      <span class="ri-count">${r.count}×</span>
+    </div>`;
+  }).join('');
+  // animate bars in
+  setTimeout(()=>list.querySelectorAll('.ri-bar').forEach(b=>b.style.width=b.dataset.p+'%'),300);
+  setTimeout(()=>{
+    list.querySelectorAll('.route-item').forEach((el,i)=>{
+      setTimeout(()=>{el.style.opacity='1';el.style.transform='translateX(0)';el.style.transition='opacity .4s,transform .4s cubic-bezier(.22,.61,.36,1)'},i*80);
+    });
+  },100);
+}
+window.highlightRoute=function(i){
+  document.querySelectorAll('.route-item').forEach((el,j)=>el.classList.toggle('active',j===i));
+};
+
+/* ══════════════════════════ FLEET BUBBLES ═══════════════════════════════ */
+function buildFleet(aircraft){
+  const wrap=document.getElementById('fleetWrap');
+  const W=wrap.clientWidth-48;const H=Math.max(480,W*.6);
+  const svg=d3.select('#fleetSvg').attr('width',W).attr('height',H).attr('viewBox',`0 0 ${W} ${H}`);
+  const tip=document.getElementById('fleetTip');
+
+  const maxC=Math.max(...aircraft.map(a=>a.count),1);
+  const rScale=d3.scaleSqrt().domain([1,maxC]).range([28,Math.min(95,W*.1)]);
+
+  const nodes=aircraft.slice(0,16).map(a=>({
+    ...a,r:rScale(a.count),
+    color:FCOLOR[FAMILY[a.aircraft_code]]||'#475569',
+    label:a.aircraft_code,
+    fullName:acName(a.aircraft_code),
+    family:FAMILY[a.aircraft_code]||'Other',
+  }));
+
+  // D3 force simulation
+  const sim=d3.forceSimulation(nodes)
+    .force('charge',d3.forceManyBody().strength(d=>-d.r*2))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collide',d3.forceCollide(d=>d.r+6).strength(.85))
+    .force('x',d3.forceX(W/2).strength(.04))
+    .force('y',d3.forceY(H/2).strength(.04))
+    .on('tick',ticked);
+
+  // Create groups: one per node
+  const nodeG=svg.selectAll('g.bnode').data(nodes).enter().append('g').attr('class','bnode')
+    .attr('transform',`translate(${W/2},${H/2})`)
+    .style('cursor','pointer')
+    .on('mousemove',function(e,d){
+      tip.style.opacity='1';
+      tip.style.left=(e.offsetX+16)+'px';
+      tip.style.top=(e.offsetY-10)+'px';
+      tip.innerHTML=`<div class="ft-name">${d.aircraft_code}</div>
+        <div class="ft-count"><b>${d.count}</b> Überflüge</div>
+        <div class="ft-family" style="color:${d.color}">${d.family}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">${d.fullName}</div>`;
+    })
+    .on('mouseleave',()=>tip.style.opacity='0')
+    .on('click',(_,d)=>{
+      nodeG.select('circle').attr('stroke-width',2).attr('stroke','rgba(255,255,255,.1)');
+      d3.select(event.currentTarget).select('circle').attr('stroke',d.color).attr('stroke-width',3);
+    });
+
+  // Outer glow ring
+  nodeG.append('circle')
+    .attr('r',d=>d.r+8)
+    .attr('fill','none')
+    .attr('stroke',d=>d.color)
+    .attr('stroke-width',1)
+    .attr('opacity',.15);
+
+  // Main bubble
+  nodeG.append('circle')
+    .attr('r',0)
+    .attr('fill',d=>`${d.color}18`)
+    .attr('stroke',d=>d.color)
+    .attr('stroke-width',1.5)
+    .attr('stroke-opacity',.5)
+    .transition().duration(900).delay((_,i)=>i*60)
+    .ease(d3.easeElastic.amplitude(1.2).period(.4))
+    .attr('r',d=>d.r);
+
+  // Plane icon inside (top-view, SVG)
+  nodeG.append('g').attr('class','plane-icon')
+    .each(function(d){
+      const g=d3.select(this);
+      const s=d.r*.038;
+      const c=d.color;
+      // fuselage
+      g.append('ellipse').attr('rx',4*s).attr('ry',20*s).attr('fill',c).attr('opacity',.5);
+      // wings
+      g.append('polygon').attr('points',`0,${-3*s} ${28*s},${6*s} ${26*s},${10*s} 0,${4*s} ${-26*s},${10*s} ${-28*s},${6*s}`).attr('fill',c).attr('opacity',.4);
+      // tail
+      g.append('polygon').attr('points',`0,${13*s} ${11*s},${21*s} ${10*s},${24*s} 0,${20*s} ${-10*s},${24*s} ${-11*s},${21*s}`).attr('fill',c).attr('opacity',.45);
+    });
+
+  // Aircraft code label
+  nodeG.append('text').attr('class','bubble-label').attr('y',d=>d.r*.35)
+    .attr('font-size',d=>Math.max(9,d.r*.22)).attr('font-weight','700').attr('fill',d=>d.color)
+    .attr('opacity',0).text(d=>d.aircraft_code)
+    .transition().duration(400).delay((_,i)=>400+i*60).attr('opacity',1);
+
+  // Count label
+  nodeG.append('text').attr('class','bubble-label').attr('y',d=>d.r*.35+d.r*.25)
+    .attr('font-size',d=>Math.max(8,d.r*.16)).attr('fill','rgba(255,255,255,.4)')
+    .attr('opacity',0).text(d=>d.count+'×')
+    .transition().duration(400).delay((_,i)=>500+i*60).attr('opacity',1);
+
+  function ticked(){
+    nodeG.attr('transform',d=>`translate(${d.x},${d.y})`);
+  }
+
+  // Gentle float after simulation settles
+  sim.on('end',()=>{
     const t0=Date.now();
-    const ease=t=>t<.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1;
-    function tick(){
-        const p=Math.min((Date.now()-t0)/dur,1);
-        el.childNodes[0]&&(el.childNodes[0].textContent=Math.round(ease(p)*target).toLocaleString('de'));
-        if(p<1)requestAnimationFrame(tick);
-        else el.childNodes[0]&&(el.childNodes[0].textContent=target.toLocaleString('de'));
+    function float(){
+      const t=(Date.now()-t0)*.001;
+      nodeG.attr('transform',d=>`translate(${d.x+Math.sin(t*.5+d.index)*2},${d.y+Math.cos(t*.4+d.index*1.3)*2})`);
+      requestAnimationFrame(float);
     }
-    // wrap text in a text node so we don't clobber child elements
-    if(!el.querySelector('span.num')){
-        const span=document.createElement('span');span.className='num';
-        span.textContent='0';el.prepend(span);
-    }
-    const numEl=el.querySelector('.num');
-    const t1=Date.now();
-    function tick2(){
-        const p=Math.min((Date.now()-t1)/dur,1);
-        numEl.textContent=Math.round(ease(p)*target).toLocaleString('de');
-        if(p<1)requestAnimationFrame(tick2);
-    }
-    requestAnimationFrame(tick2);
+    requestAnimationFrame(float);
+  });
 }
 
-/* ═══════════════════════════════════════ SVG HELPERS ════════════════════════ */
-const NS='http://www.w3.org/2000/svg';
-function svgEl(tag,attrs){
-    const el=document.createElementNS(NS,tag);
-    Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
-    return el;
-}
-function polar(cx,cy,r,deg){
-    const rad=(deg-90)*Math.PI/180;
-    return[cx+r*Math.cos(rad),cy+r*Math.sin(rad)];
-}
-function arcPath(cx,cy,r1,r2,a1,a2){
-    const [x1,y1]=polar(cx,cy,r1,a1),[x2,y2]=polar(cx,cy,r1,a2);
-    const [x3,y3]=polar(cx,cy,r2,a2),[x4,y4]=polar(cx,cy,r2,a1);
-    const lg=a2-a1>180?1:0;
-    return`M${f(x1)},${f(y1)} A${f(r1)},${f(r1)},0,${lg},1,${f(x2)},${f(y2)} L${f(x3)},${f(y3)} A${f(r2)},${f(r2)},0,${lg},0,${f(x4)},${f(y4)} Z`;
-}
-const f=n=>n.toFixed(2);
-
-/* ═══════════════════════════════════════ RADIAL CLOCK ═══════════════════════ */
-function buildRadialClock(hourly){
-    const svg=document.getElementById('radialClock');
-    const cx=160,cy=160,r0=48,rMax=136,gap=2.5,sweep=15-gap;
-    const maxC=Math.max(...hourly.map(h=>h.count),1);
-    const peak=hourly.reduce((a,b)=>b.count>a.count?b:a,{hour:0,count:0});
-
-    // defs: glow filter
-    const defs=svgEl('defs',{});
-    const flt=svgEl('filter',{id:'cGlow',x:'-30%',y:'-30%',width:'160%',height:'160%'});
-    const gb=svgEl('feGaussianBlur',{stdDeviation:'4',result:'b'});
-    const fm=svgEl('feMerge',{});
-    fm.append(svgEl('feMergeNode',{in:'b'}),svgEl('feMergeNode',{in:'SourceGraphic'}));
-    flt.append(gb,fm);defs.append(flt);svg.append(defs);
-
-    // background rings
-    [r0,(r0+rMax)/2,rMax].forEach(r=>{
-        svg.append(svgEl('circle',{cx,cy,r,fill:'none',stroke:'#0d1e35','stroke-width':'1'}));
-    });
-    // crosshairs
-    svg.append(svgEl('line',{x1:cx,y1:cy-rMax,x2:cx,y2:cy+rMax,stroke:'#0a1625','stroke-width':'0.6'}));
-    svg.append(svgEl('line',{x1:cx-rMax,y1:cy,x2:cx+rMax,y2:cy,stroke:'#0a1625','stroke-width':'0.6'}));
-
-    // hour label marks (every 6h)
-    [0,6,12,18].forEach(h=>{
-        const[lx,ly]=polar(cx,cy,rMax+16,h*15);
-        const t=svgEl('text',{x:f(lx),y:f(ly),'text-anchor':'middle','dominant-baseline':'central',fill:'#2a4a6a','font-size':'10','font-family':'monospace'});
-        t.textContent=`${h}`;svg.append(t);
-    });
-
-    // arc elements — animated
-    const paths=hourly.map((h,i)=>{
-        const p=svgEl('path',{fill:'none',d:'M0,0'});
-        const isPeak=h.count===peak.count&&peak.count>0;
-        p.setAttribute('fill',isPeak?'#f97316':'#00d4aa');
-        p.setAttribute('opacity', h.count===0?'0':(0.15+0.85*(h.count/maxC)).toFixed(2));
-        if(isPeak)p.setAttribute('filter','url(#cGlow)');
-        svg.append(p);
-        return p;
-    });
-
-    // center dot
-    svg.append(svgEl('circle',{cx,cy,r:'7',fill:'#00d4aa',opacity:'.85'}));
-    svg.append(svgEl('circle',{cx,cy,r:'3',fill:'#020810'}));
-
-    // spring animation
-    let prog=0;
-    const t0=Date.now(),dur=1300;
-    function easeElastic(t){
-        if(t<=0||t>=1)return t;
-        return Math.pow(2,-10*t)*Math.sin((t-.075)*Math.PI*2/.3)+1;
-    }
-    function anim(){
-        prog=easeElastic(Math.min((Date.now()-t0)/dur,1));
-        hourly.forEach((h,i)=>{
-            if(h.count===0)return;
-            const startDeg=i*15+gap/2;
-            const endDeg=startDeg+sweep;
-            const tR=r0+(h.count/maxC)*(rMax-r0);
-            const curR=r0+Math.max(0,(tR-r0)*prog);
-            if(curR>r0+0.5)paths[i].setAttribute('d',arcPath(cx,cy,r0,curR,startDeg,endDeg));
-        });
-        if(prog<0.999)requestAnimationFrame(anim);
-    }
-    requestAnimationFrame(anim);
-
-    // peak info
-    document.getElementById('peakBig').textContent=`${peak.hour}:00`;
-    document.getElementById('peakDesc').textContent=`${peak.count}× in dieser Stunde`;
-
-    // sidebar top-8 hours
-    const top8=[...hourly].sort((a,b)=>b.count-a.count).slice(0,8);
-    const rows=document.getElementById('hourRows');
-    rows.innerHTML=top8.map(h=>{
-        const pct=Math.round(h.count/maxC*100);
-        const col=h.count===peak.count?'#f97316':'#00d4aa';
-        return`<div class="hour-row">
-            <span class="hour-lbl">${h.hour}:00</span>
-            <div class="hour-track"><div class="hour-fill" data-p="${pct}" style="background:${col}"></div></div>
-            <span class="hour-n">${h.count}</span>
-        </div>`;
-    }).join('');
-    setTimeout(()=>rows.querySelectorAll('.hour-fill').forEach(b=>b.style.width=b.dataset.p+'%'),200);
-}
-
-/* ═══════════════════════════════════════ TOP LISTS ══════════════════════════ */
-function buildTopList(id,items,labelFn,barClass){
-    const el=document.getElementById(id);
-    const max=items[0]?.count||1;
-    const medals=['g','s','b'];
-    el.innerHTML=items.slice(0,9).map((it,i)=>{
-        const pct=Math.round(it.count/max*100);
-        return`<div class="top-item">
-            <span class="t-rank ${medals[i]||''}">${i+1}</span>
-            <span class="t-lbl" title="${labelFn(it)}">${labelFn(it)}</span>
-            <div class="t-track"><div class="t-bar ${barClass}" data-p="${pct}"></div></div>
-            <span class="t-n">${it.count}</span>
-        </div>`;
-    }).join('');
-
-    const io=new IntersectionObserver(ent=>{
-        if(!ent[0].isIntersecting)return;
-        el.querySelectorAll('.top-item').forEach((item,i)=>{
-            setTimeout(()=>{
-                item.style.opacity='1';
-                item.style.transform='translateX(0)';
-                item.style.transition='opacity .4s,transform .45s cubic-bezier(.22,.61,.36,1)';
-                const bar=item.querySelector('.t-bar');
-                if(bar)bar.style.width=bar.dataset.p+'%';
-            },i*70);
-        });
-        io.disconnect();
-    },{threshold:.15});
-    io.observe(el);
-}
-
-/* ═══════════════════════════════════════ ROUTE BUBBLES ══════════════════════ */
-function buildRouteBubbles(routes){
-    const wrap=document.getElementById('routeBubbles');
-    const max=routes[0]?.count||1;
-    const minS=52,maxS=130;
-    wrap.innerHTML=routes.slice(0,15).map((r,i)=>{
-        const sz=minS+(r.count/max)*(maxS-minS);
-        const delay=i*45;
-        return`<div class="rb" style="width:${sz}px;height:${sz}px;transition-delay:${delay}ms">
-            <div class="rb-route">${r.origin_airport_iata}→${r.destination_airport_iata}</div>
-            <div class="rb-n">${r.count}×</div>
-        </div>`;
-    }).join('');
-
-    const io=new IntersectionObserver(ent=>{
-        if(!ent[0].isIntersecting)return;
-        wrap.querySelectorAll('.rb').forEach((b,i)=>{
-            setTimeout(()=>{
-                b.style.opacity='1';
-                b.style.transform='scale(1)';
-                b.style.transition='opacity .5s,transform .6s cubic-bezier(.34,1.56,.64,1)';
-            },i*45);
-        });
-        io.disconnect();
-    },{threshold:.1});
-    io.observe(wrap);
-}
-
-/* ═══════════════════════════════════════ HEATMAP ════════════════════════════ */
+/* ══════════════════════════ HEATMAP ════════════════════════════════════ */
 function buildHeatmap(hm){
-    const grid=document.getElementById('heatGrid');
-    const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
-    const maxV=Math.max(1,...Object.values(hm));
-    let html='<div></div>';
-    for(let h=0;h<24;h++)html+=`<div class="hm-h">${h}</div>`;
-    for(let d=0;d<7;d++){
-        html+=`<div class="hm-d">${days[d]}</div>`;
-        for(let h=0;h<24;h++){
-            const n=hm[`${d},${h}`]||0;
-            const iv=n/maxV;
-            const bg=n===0?'rgba(255,255,255,.03)'
-                :`rgba(0,${Math.round(70+iv*142)},${Math.round(iv*160)},${(0.08+iv*.92).toFixed(2)})`;
-            const delay=(d*24+h)*6;
-            html+=`<div class="hm-cell" style="background:${bg}" title="${days[d]} ${h}:00 · ${n}×"></div>`;
-        }
+  const grid=document.getElementById('hmGrid');
+  const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const maxV=Math.max(1,...Object.values(hm));
+  let html='<div></div>';
+  for(let h=0;h<24;h++)html+=`<div class="hm-h">${h}</div>`;
+  for(let d=0;d<7;d++){
+    html+=`<div class="hm-d">${days[d]}</div>`;
+    for(let h=0;h<24;h++){
+      const n=hm[`${d},${h}`]||0;const iv=n/maxV;
+      const bg=n===0?'rgba(255,255,255,.03)':`rgba(0,${Math.round(70+iv*142)},${Math.round(iv*160)},${(0.06+iv*.94).toFixed(2)})`;
+      html+=`<div class="hm-c" style="background:${bg}" title="${days[d]} ${h}:00 · ${n}×"></div>`;
     }
-    grid.innerHTML=html;
-
-    const cells=grid.querySelectorAll('.hm-cell');
-    const io=new IntersectionObserver(ent=>{
-        if(!ent[0].isIntersecting)return;
-        cells.forEach((c,i)=>{
-            setTimeout(()=>{
-                c.classList.add('vis');
-                c.style.opacity='1';
-                c.style.transform='scale(1)';
-            },i*6);
-        });
-        io.disconnect();
-    },{threshold:.05});
-    io.observe(grid);
+  }
+  grid.innerHTML=html;
+  const cells=grid.querySelectorAll('.hm-c');
+  const io=new IntersectionObserver(e=>{
+    if(!e[0].isIntersecting)return;
+    cells.forEach((c,i)=>setTimeout(()=>c.classList.add('vis'),i*5));
+    io.disconnect();
+  },{threshold:.05});
+  io.observe(grid);
 }
 
-/* ═══════════════════════════════════════ AREA CHART ═════════════════════════ */
-function buildAreaChart(daily){
-    const svg=document.getElementById('areaSvg');
-    const wrap=document.getElementById('areaWrap');
-    const W=wrap.clientWidth||760;
-    const H=210;
-    svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-    svg.setAttribute('width',W);
-
-    const rev=[...daily].reverse();
-    if(rev.length<2)return;
-    const counts=rev.map(d=>d.count);
-    const maxC=Math.max(...counts,1);
-    const n=counts.length;
-    const pL=36,pR=12,pT=18,pB=36;
-    const cW=W-pL-pR,cH=H-pT-pB;
-    const x=i=>pL+(i/(n-1))*cW;
-    const y=v=>pT+cH-(v/maxC)*cH;
-
-    let out='';
-
-    // grid lines + y labels
-    for(let i=0;i<=4;i++){
-        const yy=pT+(i/4)*cH;
-        const lv=Math.round((1-i/4)*maxC);
-        out+=`<line x1="${pL}" y1="${f(yy)}" x2="${W-pR}" y2="${f(yy)}" stroke="#0c1929" stroke-width="1"/>`;
-        out+=`<text x="${pL-5}" y="${f(yy)}" text-anchor="end" dominant-baseline="central" fill="#2a4a6a" font-size="9" font-family="monospace">${lv}</text>`;
-    }
-
-    // date labels every ~5 days
-    rev.forEach((d,i)=>{
-        if(i%Math.max(1,Math.floor(n/8))!==0&&i!==n-1)return;
-        const[,m,dd]=d.date.split('-');
-        out+=`<text x="${f(x(i))}" y="${H-8}" text-anchor="middle" fill="#2a4a6a" font-size="9" font-family="monospace">${dd}.${m}</text>`;
-    });
-
-    // area path
-    const pts=counts.map((c,i)=>`${f(x(i))},${f(y(c))}`).join(' L');
-    const areaD=`M${f(x(0))},${f(y(0))} L${pts} L${f(x(n-1))},${f(y(0))} Z`;
-    const lineD=`M${pts}`;
-
-    // compute approx path length for dash animation
-    let len=0;
-    for(let i=1;i<n;i++){
-        const dx=x(i)-x(i-1),dy=y(counts[i])-y(counts[i-1]);
-        len+=Math.sqrt(dx*dx+dy*dy);
-    }
-    len=Math.ceil(len)+50;
-
-    // peak dot highlight
-    const pkI=counts.indexOf(Math.max(...counts));
-    const pkX=f(x(pkI)),pkY=f(y(counts[pkI]));
-
-    out+=`<path d="${areaD}" fill="url(#aGrad)" opacity="0">
-        <animate attributeName="opacity" from="0" to="1" dur=".7s" begin="0.5s" fill="freeze"/>
-    </path>`;
-    out+=`<path d="${lineD}" fill="none" stroke="#00d4aa" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round" filter="url(#lineGlow)"
-        stroke-dasharray="${len}" stroke-dashoffset="${len}">
-        <animate attributeName="stroke-dashoffset" from="${len}" to="0"
-            dur="1.4s" begin="0.15s" fill="freeze" calcMode="spline"
-            keyTimes="0;1" keySplines="0.22 0.61 0.36 1"/>
-    </path>`;
-
-    // dots
-    counts.forEach((c,i)=>{
-        const isPk=i===pkI;
-        out+=`<circle cx="${f(x(i))}" cy="${f(y(c))}" r="${isPk?5.5:3}"
-            fill="${isPk?'#f97316':'#00d4aa'}"
-            ${isPk?'filter="url(#lineGlow)"':''}
-            opacity="0">
-            <animate attributeName="opacity" from="0" to="1" dur=".2s" begin="${0.8+i*(1.2/n)}s" fill="freeze"/>
-        </circle>`;
-        if(isPk){
-            out+=`<text x="${f(x(i))}" y="${f(y(c)-12)}" text-anchor="middle" fill="#f97316" font-size="10" font-family="monospace" opacity="0">
-                ${c}
-                <animate attributeName="opacity" from="0" to="1" dur=".3s" begin="${1.0+i*(1.2/n)}s" fill="freeze"/>
-            </text>`;
-        }
-    });
-
-    svg.innerHTML+=out;
+/* ══════════════════════════ AREA CHART ════════════════════════════════ */
+function buildArea(daily){
+  const svg=document.getElementById('areaSvg');
+  const wrap=svg.parentElement;
+  const W=wrap.clientWidth-48;const H=220;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('width',W);
+  const rev=[...daily].reverse();if(rev.length<2)return;
+  const counts=rev.map(d=>d.count);const maxC=Math.max(...counts,1);
+  const n=counts.length;const pL=36,pR=12,pT=18,pB=34,cW=W-pL-pR,cH=H-pT-pB;
+  const x=i=>pL+(i/(n-1))*cW,y=v=>pT+cH-(v/maxC)*cH;
+  const f=n=>n.toFixed(1);
+  let out='';
+  for(let i=0;i<=4;i++){const yy=pT+(i/4)*cH;
+    out+=`<line x1="${pL}" y1="${f(yy)}" x2="${W-pR}" y2="${f(yy)}" stroke="#0c1929" stroke-width="1"/>`;
+    out+=`<text x="${pL-5}" y="${f(yy)}" text-anchor="end" dominant-baseline="central" fill="#253a55" font-size="9" font-family="monospace">${Math.round((1-i/4)*maxC)}</text>`;
+  }
+  rev.forEach((d,i)=>{
+    if(i%Math.max(1,Math.floor(n/8))!==0&&i!==n-1)return;
+    const[,m,dd]=d.date.split('-');
+    out+=`<text x="${f(x(i))}" y="${H-8}" text-anchor="middle" fill="#253a55" font-size="9" font-family="monospace">${dd}.${m}</text>`;
+  });
+  const pts=counts.map((c,i)=>`${f(x(i))},${f(y(c))}`).join(' L');
+  const aD=`M${f(x(0))},${f(y(0))} L${pts} L${f(x(n-1))},${f(y(0))} Z`;
+  let len=0;for(let i=1;i<n;i++){const dx=x(i)-x(i-1),dy=y(counts[i])-y(counts[i-1]);len+=Math.sqrt(dx*dx+dy*dy)}len=Math.ceil(len)+50;
+  const pkI=counts.indexOf(Math.max(...counts));
+  out+=`<path d="${aD}" fill="url(#aGrad)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".7s" begin=".5s" fill="freeze"/></path>`;
+  out+=`<path d="M${pts}" fill="none" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#lGlow)" stroke-dasharray="${len}" stroke-dashoffset="${len}"><animate attributeName="stroke-dashoffset" from="${len}" to="0" dur="1.4s" begin=".1s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".22 .61 .36 1"/></path>`;
+  counts.forEach((c,i)=>{
+    const isPk=i===pkI;
+    out+=`<circle cx="${f(x(i))}" cy="${f(y(c))}" r="${isPk?5.5:2.5}" fill="${isPk?'#f97316':'#00d4aa'}" ${isPk?'filter="url(#lGlow)"':''} opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".2s" begin="${.9+i*(1.2/n)}s" fill="freeze"/></circle>`;
+    if(isPk)out+=`<text x="${f(x(i))}" y="${f(y(c)-11)}" text-anchor="middle" fill="#f97316" font-size="10" font-family="monospace" opacity="0">${c}<animate attributeName="opacity" from="0" to="1" dur=".3s" begin="${1.1}s" fill="freeze"/></text>`;
+  });
+  svg.innerHTML+=out;
 }
 
-/* ═══════════════════════════════════════ WEEKDAY RING ═══════════════════════ */
-function buildWeekdayRing(weekdays){
-    const svg=document.getElementById('wdRing');
-    const cx=130,cy=130,r0=45,rMax=108,gap=3,sweep=360/7-gap;
-    const maxC=Math.max(...weekdays.map(w=>w.count),1);
-    const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
-    const colors=['#00d4aa','#00d4aa','#00d4aa','#00d4aa','#00d4aa','#a855f7','#a855f7'];
-
-    const defs=svgEl('defs',{});
-    const flt=svgEl('filter',{id:'wGlow',x:'-30%',y:'-30%',width:'160%',height:'160%'});
-    const gb=svgEl('feGaussianBlur',{stdDeviation:'3',result:'b'});
-    const fm=svgEl('feMerge',{});
-    fm.append(svgEl('feMergeNode',{in:'b'}),svgEl('feMergeNode',{in:'SourceGraphic'}));
-    flt.append(gb,fm);defs.append(flt);svg.append(defs);
-
-    [r0,(r0+rMax)/2,rMax].forEach(r=>{
-        svg.append(svgEl('circle',{cx,cy,r,fill:'none',stroke:'#0c1929','stroke-width':'1'}));
-    });
-
-    const paths=weekdays.map((w,i)=>{
-        const p=svgEl('path',{fill:'none',d:'M0,0'});
-        const isWe=i>=5;
-        p.setAttribute('fill',isWe?'#a855f7':'#00d4aa');
-        p.setAttribute('opacity',(0.15+0.85*(w.count/maxC)).toFixed(2));
-        if(w.count===Math.max(...weekdays.map(x=>x.count)))p.setAttribute('filter','url(#wGlow)');
-        svg.append(p);
-        return p;
-    });
-
-    // day labels
-    weekdays.forEach((_,i)=>{
-        const angleMid=i*(360/7)+gap/2+sweep/2;
-        const[lx,ly]=polar(cx,cy,rMax+14,angleMid);
-        const t=svgEl('text',{x:f(lx),y:f(ly),'text-anchor':'middle','dominant-baseline':'central',
-            fill:'#2a4a6a','font-size':'10','font-family':'sans-serif'});
-        t.textContent=days[i];svg.append(t);
-    });
-
-    svg.append(svgEl('circle',{cx,cy,r:'5',fill:'#00d4aa',opacity:'.8'}));
-
-    let prog=0;const t0=Date.now(),dur=1100;
-    function ease(t){return t<.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1}
-    function anim(){
-        prog=ease(Math.min((Date.now()-t0)/dur,1));
-        weekdays.forEach((w,i)=>{
-            if(w.count===0)return;
-            const a1=i*(360/7)+gap/2;
-            const a2=a1+sweep;
-            const tR=r0+(w.count/maxC)*(rMax-r0);
-            const cR=r0+Math.max(0,(tR-r0)*prog);
-            if(cR>r0+.5)paths[i].setAttribute('d',arcPath(cx,cy,r0,cR,a1,a2));
-        });
-        if(prog<.999)requestAnimationFrame(anim);
-    }
-    const io=new IntersectionObserver(ent=>{
-        if(!ent[0].isIntersecting)return;
-        requestAnimationFrame(anim);io.disconnect();
-    },{threshold:.2});
-    io.observe(svg);
-}
-
-/* ═══════════════════════════════════════ MAIN LOAD ══════════════════════════ */
+/* ══════════════════════════ MAIN LOAD ══════════════════════════════════ */
 async function load(){
-    let d;
-    try{
-        const r=await fetch('/api/stats');
-        d=await r.json();
-        if(d.error)throw new Error(d.error);
-    }catch(e){
-        document.getElementById('heroSub').textContent='Fehler beim Laden der Daten';
-        return;
-    }
+  let d;
+  try{const r=await fetch('/api/stats');d=await r.json();if(d.error)throw 0}
+  catch(e){document.getElementById('heroSub').textContent='Fehler beim Laden';return}
 
-    // Hero counter
-    const heroEl=document.getElementById('heroNum');
-    heroEl.textContent='0';
-    setTimeout(()=>countUp(heroEl,d.total,1800),600);
+  // Counter
+  setTimeout(()=>countUp(document.getElementById('heroNum'),d.total),700);
+  document.getElementById('heroSub').textContent=`${d.daily.length} Tage · ${d.total.toLocaleString('de')} Überflüge insgesamt`;
 
-    const days30=d.daily.length;
-    document.getElementById('heroSub').textContent=
-        `${days30} Tage Beobachtungszeitraum · ${d.total.toLocaleString('de')} Überflüge gesamt`;
+  // Pills
+  const tod=d.daily.find(x=>x.date===new Date().toISOString().slice(0,10));
+  document.getElementById('pToday').textContent=(tod?.count??0).toLocaleString('de');
+  const pk=d.hourly.reduce((a,b)=>b.count>a.count?b:a,{hour:0,count:0});
+  document.getElementById('pPeak').textContent=pk.count?`${pk.hour}–${pk.hour+1}h`:'–';
+  document.getElementById('pPeakH').textContent=pk.count?`${pk.count} Flüge`:'';
+  if(d.airlines.length){const a=d.airlines[0];document.getElementById('pAirline').textContent=alName(a.airline_iata,a.airline_icao);document.getElementById('pAirH').textContent=`${a.count}×`}
+  if(d.aircraft.length){const a=d.aircraft[0];document.getElementById('pAc').textContent=a.aircraft_code;document.getElementById('pAcH').textContent=acName(a.aircraft_code)}
 
-    // Pills
-    const todayStr=new Date().toISOString().slice(0,10);
-    const tod=d.daily.find(x=>x.date===todayStr);
-    document.getElementById('pToday').textContent=(tod?.count??0).toLocaleString('de');
-
-    const peak=d.hourly.reduce((a,b)=>b.count>a.count?b:a,{hour:0,count:0});
-    document.getElementById('pPeak').textContent=peak.count?`${peak.hour}–${peak.hour+1}h`:'–';
-    document.getElementById('pPeakH').textContent=peak.count?`${peak.count} Flüge`:'';
-
-    if(d.airlines.length){
-        const a=d.airlines[0];
-        document.getElementById('pAirline').textContent=alName(a.airline_iata,a.airline_icao);
-        document.getElementById('pAirlineH').textContent=`${a.count}× gesichtet`;
-    }
-    if(d.aircraft.length){
-        const a=d.aircraft[0];
-        document.getElementById('pAc').textContent=acName(a.aircraft_code);
-        document.getElementById('pAcH').textContent=`${a.count}× gesichtet`;
-    }
-
-    // Visualizations
-    buildRadialClock(d.hourly);
-    buildTopList('topAirlines',d.airlines,r=>alName(r.airline_iata,r.airline_icao),'te');
-    buildTopList('topAircraft',d.aircraft,r=>acName(r.aircraft_code),'pu');
-    buildRouteBubbles(d.routes);
-    buildHeatmap(d.heatmap||{});
-    buildAreaChart(d.daily);
-    buildWeekdayRing(d.weekdays);
+  buildGlobe(d.routes);
+  buildFleet(d.aircraft);
+  buildHeatmap(d.heatmap||{});
+  buildArea(d.daily);
 }
-
 load();
 </script>
 </body>
