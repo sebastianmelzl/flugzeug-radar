@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flugzeug Radar – Daten-Visualisierung</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+    --teal:#00d4aa;--orange:#f97316;--purple:#a855f7;--blue:#3b82f6;
+    --bg:#020810;--card:rgba(13,21,40,.75);--border:#1a3050;
+    --text:#e2e8f0;--muted:#475569;--dim:#1e3a5f;
+}
+
+html{scroll-behavior:smooth}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+
+#stars{position:fixed;inset:0;pointer-events:none;z-index:0}
+
+.page{position:relative;z-index:1}
+
+/* ── Header ── */
+header{
+    background:rgba(2,8,16,.85);backdrop-filter:blur(24px);
+    border-bottom:1px solid var(--border);
+    padding:14px 32px;display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:100;
+}
+.logo{font-size:16px;font-weight:800;color:var(--teal);letter-spacing:-.01em}
+.nav{display:flex;gap:10px}
+.nav a{
+    color:var(--muted);text-decoration:none;font-size:12px;
+    padding:6px 14px;border-radius:8px;border:1px solid transparent;transition:all .15s;
+}
+.nav a:hover{border-color:var(--teal);color:var(--teal)}
+
+/* ── Hero ── */
+.hero{
+    min-height:90vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:80px 32px 60px;text-align:center;
+}
+.hero-eyebrow{
+    font-size:11px;text-transform:uppercase;letter-spacing:.3em;color:var(--muted);
+    margin-bottom:20px;opacity:0;animation:fadeUp .6s .3s forwards;
+}
+#heroNum{
+    font-size:clamp(72px,14vw,152px);font-weight:900;line-height:1;
+    color:var(--teal);font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+    text-shadow:0 0 80px rgba(0,212,170,.25),0 0 200px rgba(0,212,170,.08);
+    opacity:0;animation:fadeUp .9s .4s forwards;
+}
+.hero-unit{
+    font-size:clamp(18px,3vw,32px);font-weight:300;color:rgba(0,212,170,.5);
+    margin-left:8px;vertical-align:middle;
+}
+.hero-sub{
+    font-size:15px;color:var(--muted);margin-top:16px;
+    opacity:0;animation:fadeUp .6s .7s forwards;
+}
+.pills{
+    display:flex;gap:14px;margin-top:56px;flex-wrap:wrap;justify-content:center;
+}
+.pill{
+    background:rgba(13,21,40,.9);backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:18px;padding:18px 26px;min-width:150px;
+    opacity:0;transform:translateY(16px);
+}
+.pill:nth-child(1){animation:fadeUp .5s .9s forwards}
+.pill:nth-child(2){animation:fadeUp .5s 1.05s forwards}
+.pill:nth-child(3){animation:fadeUp .5s 1.2s forwards}
+.pill:nth-child(4){animation:fadeUp .5s 1.35s forwards}
+.pill-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:8px}
+.pill-val{font-size:clamp(20px,3.5vw,28px);font-weight:800;color:var(--teal);line-height:1}
+.pill-val.ora{color:var(--orange)}
+.pill-val.sm{font-size:clamp(14px,2.5vw,18px);padding-top:4px}
+.pill-hint{font-size:10px;color:var(--muted);margin-top:5px}
+
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+
+/* ── Section chrome ── */
+section{padding:72px 32px;max-width:1280px;margin:0 auto}
+.sec-eye{font-size:10px;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:10px}
+.sec-title{
+    font-size:clamp(26px,4vw,46px);font-weight:800;line-height:1.1;margin-bottom:48px;
+}
+.sec-title em{color:var(--teal);font-style:normal}
+
+/* ── Glass card ── */
+.glass{
+    background:var(--card);backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:22px;padding:36px;
+}
+
+/* ── Radial clock ── */
+.radial-row{display:flex;align-items:center;gap:56px;flex-wrap:wrap}
+#radialClock{width:min(340px,90vw);height:min(340px,90vw);flex-shrink:0;filter:drop-shadow(0 0 48px rgba(0,212,170,.12))}
+.radial-meta{flex:1;min-width:220px}
+.peak-hour-big{font-size:clamp(48px,8vw,80px);font-weight:900;color:var(--orange);line-height:1;
+    text-shadow:0 0 40px rgba(249,115,22,.35)}
+.peak-desc{font-size:13px;color:var(--muted);margin-top:8px;margin-bottom:32px}
+.hour-rows{display:flex;flex-direction:column;gap:8px}
+.hour-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.hour-lbl{color:var(--muted);width:38px;font-family:monospace;flex-shrink:0}
+.hour-track{flex:1;height:5px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.hour-fill{height:100%;border-radius:3px;width:0;transition:width 1s cubic-bezier(.22,.61,.36,1)}
+.hour-n{color:var(--muted);width:28px;text-align:right;font-family:monospace;flex-shrink:0}
+
+/* ── Top lists ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:780px){.two-col{grid-template-columns:1fr}}
+.list-title{font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:var(--muted);margin-bottom:24px}
+.top-item{
+    display:flex;align-items:center;gap:10px;margin-bottom:13px;
+    opacity:0;transform:translateX(-18px);
+}
+.t-rank{font-size:11px;font-weight:700;width:20px;text-align:right;flex-shrink:0;color:rgba(255,255,255,.15)}
+.t-rank.g{color:#f59e0b}.t-rank.s{color:#94a3b8}.t-rank.b{color:#b45309}
+.t-lbl{font-size:13px;color:var(--text);min-width:110px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.t-track{flex:1;height:6px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.t-bar{height:100%;border-radius:3px;width:0;transition:width 1s cubic-bezier(.22,.61,.36,1)}
+.t-bar.te{background:linear-gradient(90deg,#00957a,var(--teal))}
+.t-bar.pu{background:linear-gradient(90deg,#6d28d9,var(--purple))}
+.t-n{font-size:13px;font-weight:700;color:var(--text);width:34px;text-align:right;font-family:monospace;flex-shrink:0}
+
+/* ── Heatmap ── */
+#heatGrid{display:grid;grid-template-columns:28px repeat(24,1fr);gap:3px}
+.hm-h{font-size:9px;color:var(--muted);text-align:center;font-family:monospace;padding-bottom:2px}
+.hm-d{font-size:10px;color:var(--muted);display:flex;align-items:center;justify-content:flex-end;padding-right:4px}
+.hm-cell{
+    aspect-ratio:1;border-radius:4px;cursor:default;
+    opacity:0;transform:scale(.2);transition:transform .1s;
+}
+.hm-cell.vis{transition:opacity .45s,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.hm-cell:hover{transform:scale(1.2)!important;outline:1px solid var(--teal);z-index:2;position:relative}
+
+/* ── Area chart ── */
+#areaWrap{width:100%;overflow:hidden}
+#areaSvg{display:block;width:100%;overflow:visible}
+
+/* ── Weekday radial ── */
+#wdRing{width:min(260px,80vw);height:min(260px,80vw);margin:0 auto;display:block}
+
+/* ── Route bubbles ── */
+#routeBubbles{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:8px 0}
+.rb{
+    border-radius:50%;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.25);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    cursor:default;transition:transform .15s,box-shadow .15s;
+    text-align:center;padding:8px;
+    opacity:0;transform:scale(.3);
+}
+.rb:hover{transform:scale(1.08)!important;box-shadow:0 0 24px rgba(0,212,170,.2)}
+.rb-route{font-size:clamp(10px,1.5vw,13px);font-weight:700;color:var(--teal);white-space:nowrap}
+.rb-n{font-size:clamp(9px,1.2vw,11px);color:var(--muted);margin-top:2px}
+
+/* ── Divider + footer ── */
+.footer{padding:48px 32px;display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap}
+.footer a{
+    color:var(--muted);text-decoration:none;font-size:13px;
+    border:1px solid var(--border);padding:10px 22px;border-radius:11px;transition:all .15s;
+}
+.footer a:hover{border-color:var(--teal);color:var(--teal)}
+.footer a.prim{color:var(--teal);border-color:var(--dim)}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="page">
+
+<header>
+    <div class="logo">✈ Radar Insights</div>
+    <nav class="nav">
+        <a href="/">← Radar</a>
+        <a href="/stats">Tabellen</a>
+    </nav>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+    <div class="hero-eyebrow">Flugzeuge über meinem Standort</div>
+    <div>
+        <span id="heroNum">0</span>
+    </div>
+    <div class="hero-sub" id="heroSub">wird geladen …</div>
+    <div class="pills">
+        <div class="pill">
+            <div class="pill-lbl">Heute</div>
+            <div class="pill-val" id="pToday">–</div>
+            <div class="pill-hint">Überflüge</div>
+        </div>
+        <div class="pill">
+            <div class="pill-lbl">Peak-Stunde</div>
+            <div class="pill-val ora" id="pPeak">–</div>
+            <div class="pill-hint" id="pPeakH"></div>
+        </div>
+        <div class="pill">
+            <div class="pill-lbl">Top Airline</div>
+            <div class="pill-val sm" id="pAirline">–</div>
+            <div class="pill-hint" id="pAirlineH"></div>
+        </div>
+        <div class="pill">
+            <div class="pill-lbl">Top Modell</div>
+            <div class="pill-val sm" id="pAc">–</div>
+            <div class="pill-hint" id="pAcH"></div>
+        </div>
+    </div>
+</div>
+
+<!-- RADIAL CLOCK -->
+<section>
+    <div class="sec-eye">Zeitanalyse</div>
+    <div class="sec-title">Wann fliegen die meisten<br>Flugzeuge <em>über mich</em>?</div>
+    <div class="glass">
+        <div class="radial-row">
+            <svg id="radialClock" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="radial-meta">
+                <div class="peak-hour-big" id="peakBig">–</div>
+                <div class="peak-desc" id="peakDesc">–</div>
+                <div class="hour-rows" id="hourRows"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TOP LISTS -->
+<section>
+    <div class="sec-eye">Ranglisten</div>
+    <div class="sec-title">Die häufigsten<br><em>Airlines &amp; Modelle</em></div>
+    <div class="two-col">
+        <div class="glass">
+            <div class="list-title">Top Airlines</div>
+            <div id="topAirlines"></div>
+        </div>
+        <div class="glass">
+            <div class="list-title">Top Flugzeugmodelle</div>
+            <div id="topAircraft"></div>
+        </div>
+    </div>
+</section>
+
+<!-- ROUTE BUBBLES -->
+<section>
+    <div class="sec-eye">Routen</div>
+    <div class="sec-title">Die häufigsten <em>Routen</em></div>
+    <div class="glass">
+        <div id="routeBubbles"></div>
+    </div>
+</section>
+
+<!-- HEATMAP -->
+<section>
+    <div class="sec-eye">Aktivitätsmuster</div>
+    <div class="sec-title">An welchem Wochentag<br>und welcher Uhrzeit ist <em>viel los</em>?</div>
+    <div class="glass">
+        <div style="overflow-x:auto">
+            <div style="min-width:540px">
+                <div id="heatGrid"></div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:11px;color:var(--muted)">
+                    <span>ruhig</span>
+                    <div style="flex:1;max-width:180px;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(0,80,60,.15),var(--teal))"></div>
+                    <span>viel Betrieb</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 30-DAY TREND + WEEKDAY RING side by side -->
+<section>
+    <div class="sec-eye">Verlauf</div>
+    <div class="sec-title">30-Tage-Trend &amp; <em>Wochenrhythmus</em></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start">
+        <div class="glass">
+            <div id="areaWrap">
+                <svg id="areaSvg" height="210">
+                    <defs>
+                        <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#00d4aa" stop-opacity=".28"/>
+                            <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+                        </linearGradient>
+                        <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                </svg>
+            </div>
+        </div>
+        <div class="glass" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:var(--muted);align-self:flex-start">Wochentage</div>
+            <svg id="wdRing" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+    </div>
+</section>
+
+<div style="border-top:1px solid var(--border);margin:0 32px"></div>
+<div class="footer">
+    <a href="/" class="prim">← Zurück zum Radar</a>
+    <a href="/stats">Statistik-Tabellen ↗</a>
+</div>
+</div><!-- .page -->
+
+<script>
+/* ═══════════════════════════════════════ LOOKUP TABLES ══════════════════════ */
+const AIRLINES={
+    LH:'Lufthansa',LX:'Swiss',OS:'Austrian',EW:'Eurowings','4U':'Eurowings','4Y':'Eurowings Disc.',
+    DE:'Condor',BQ:'Sundair',X3:'TUI fly DE',WK:'Edelweiss',EN:'Air Dolomiti',
+    BA:'British Airways',EI:'Aer Lingus',LS:'Jet2',BY:'TUI Airways',FR:'Ryanair',U2:'easyJet',
+    DY:'Norwegian',KL:'KLM',HV:'Transavia',SN:'Brussels Airlines',AF:'Air France',
+    IB:'Iberia',VY:'Vueling',AZ:'ITA Airways',TP:'TAP Portugal',SK:'SAS',AY:'Finnair',
+    TK:'Turkish Airlines',PC:'Pegasus',EK:'Emirates',FZ:'flydubai',EY:'Etihad',
+    QR:'Qatar Airways',SQ:'Singapore Airlines',CX:'Cathay Pacific',
+    AA:'American',UA:'United',DL:'Delta',AC:'Air Canada',W6:'Wizz Air',
+    DLH:'Lufthansa',EWG:'Eurowings',SWR:'Swiss',AUA:'Austrian',CFG:'Condor',
+    RYR:'Ryanair',EZY:'easyJet',WZZ:'Wizz Air',THY:'Turkish Airlines',PGT:'Pegasus',
+    UAE:'Emirates',ETD:'Etihad',QTR:'Qatar Airways',KLM:'KLM',TRA:'Transavia',
+    AFR:'Air France',BAW:'British Airways',EIN:'Aer Lingus',IBE:'Iberia',
+    TAP:'TAP Portugal',SAS:'SAS',FIN:'Finnair',LOT:'LOT Polish',
+    CLX:'Cargolux',GEC:'Lufthansa Cargo',NJE:'NetJets',
+};
+const AIRCRAFT={
+    A20N:'A320neo',A21N:'A321neo',A19N:'A319neo',
+    A318:'A318',A319:'A319',A320:'A320',A321:'A321',
+    A332:'A330-200',A333:'A330-300',A359:'A350-900',A35K:'A350-1000',A388:'A380',
+    B737:'737-700',B738:'737-800',B739:'737-900',
+    B37M:'737 MAX 7',B38M:'737 MAX 8',B39M:'737 MAX 9',
+    B744:'747-400',B748:'747-8',B752:'757-200',B763:'767-300',
+    B772:'777-200',B773:'777-300',B77W:'777-300ER',
+    B788:'787-8',B789:'787-9',B78X:'787-10',
+    E170:'E170',E175:'E175',E190:'E190',E195:'E195',
+    CRJ2:'CRJ-200',CRJ7:'CRJ-700',CRJ9:'CRJ-900',
+    AT75:'ATR 72',AT76:'ATR 72-600',DH8D:'Q400',
+};
+
+function alName(i,c){return AIRLINES[i]||AIRLINES[c]||i||c||'–'}
+function acName(c){return AIRCRAFT[c]||c||'–'}
+
+/* ═══════════════════════════════════════ STARS CANVAS ═══════════════════════ */
+(function(){
+    const c=document.getElementById('stars'),ctx=c.getContext('2d');
+    let W,H,stars=[];
+    function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
+    function mkStars(){
+        stars=Array.from({length:220},()=>({
+            x:Math.random()*W,y:Math.random()*H,
+            r:Math.random()*.9+.15,
+            base:Math.random()*.18+.04,
+            phase:Math.random()*Math.PI*2,
+            spd:Math.random()*.015+.005,
+        }));
+    }
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        const t=Date.now()*.001;
+        stars.forEach(s=>{
+            const op=s.base*(0.6+0.4*Math.sin(s.phase+t*s.spd*40));
+            ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+            ctx.fillStyle=`rgba(180,215,255,${op.toFixed(3)})`;ctx.fill();
+        });
+        requestAnimationFrame(draw);
+    }
+    resize();mkStars();draw();
+    window.addEventListener('resize',()=>{resize();mkStars()});
+})();
+
+/* ═══════════════════════════════════════ COUNTER ════════════════════════════ */
+function countUp(el,target,dur=2000){
+    const t0=Date.now();
+    const ease=t=>t<.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1;
+    function tick(){
+        const p=Math.min((Date.now()-t0)/dur,1);
+        el.childNodes[0]&&(el.childNodes[0].textContent=Math.round(ease(p)*target).toLocaleString('de'));
+        if(p<1)requestAnimationFrame(tick);
+        else el.childNodes[0]&&(el.childNodes[0].textContent=target.toLocaleString('de'));
+    }
+    // wrap text in a text node so we don't clobber child elements
+    if(!el.querySelector('span.num')){
+        const span=document.createElement('span');span.className='num';
+        span.textContent='0';el.prepend(span);
+    }
+    const numEl=el.querySelector('.num');
+    const t1=Date.now();
+    function tick2(){
+        const p=Math.min((Date.now()-t1)/dur,1);
+        numEl.textContent=Math.round(ease(p)*target).toLocaleString('de');
+        if(p<1)requestAnimationFrame(tick2);
+    }
+    requestAnimationFrame(tick2);
+}
+
+/* ═══════════════════════════════════════ SVG HELPERS ════════════════════════ */
+const NS='http://www.w3.org/2000/svg';
+function svgEl(tag,attrs){
+    const el=document.createElementNS(NS,tag);
+    Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
+    return el;
+}
+function polar(cx,cy,r,deg){
+    const rad=(deg-90)*Math.PI/180;
+    return[cx+r*Math.cos(rad),cy+r*Math.sin(rad)];
+}
+function arcPath(cx,cy,r1,r2,a1,a2){
+    const [x1,y1]=polar(cx,cy,r1,a1),[x2,y2]=polar(cx,cy,r1,a2);
+    const [x3,y3]=polar(cx,cy,r2,a2),[x4,y4]=polar(cx,cy,r2,a1);
+    const lg=a2-a1>180?1:0;
+    return`M${f(x1)},${f(y1)} A${f(r1)},${f(r1)},0,${lg},1,${f(x2)},${f(y2)} L${f(x3)},${f(y3)} A${f(r2)},${f(r2)},0,${lg},0,${f(x4)},${f(y4)} Z`;
+}
+const f=n=>n.toFixed(2);
+
+/* ═══════════════════════════════════════ RADIAL CLOCK ═══════════════════════ */
+function buildRadialClock(hourly){
+    const svg=document.getElementById('radialClock');
+    const cx=160,cy=160,r0=48,rMax=136,gap=2.5,sweep=15-gap;
+    const maxC=Math.max(...hourly.map(h=>h.count),1);
+    const peak=hourly.reduce((a,b)=>b.count>a.count?b:a,{hour:0,count:0});
+
+    // defs: glow filter
+    const defs=svgEl('defs',{});
+    const flt=svgEl('filter',{id:'cGlow',x:'-30%',y:'-30%',width:'160%',height:'160%'});
+    const gb=svgEl('feGaussianBlur',{stdDeviation:'4',result:'b'});
+    const fm=svgEl('feMerge',{});
+    fm.append(svgEl('feMergeNode',{in:'b'}),svgEl('feMergeNode',{in:'SourceGraphic'}));
+    flt.append(gb,fm);defs.append(flt);svg.append(defs);
+
+    // background rings
+    [r0,(r0+rMax)/2,rMax].forEach(r=>{
+        svg.append(svgEl('circle',{cx,cy,r,fill:'none',stroke:'#0d1e35','stroke-width':'1'}));
+    });
+    // crosshairs
+    svg.append(svgEl('line',{x1:cx,y1:cy-rMax,x2:cx,y2:cy+rMax,stroke:'#0a1625','stroke-width':'0.6'}));
+    svg.append(svgEl('line',{x1:cx-rMax,y1:cy,x2:cx+rMax,y2:cy,stroke:'#0a1625','stroke-width':'0.6'}));
+
+    // hour label marks (every 6h)
+    [0,6,12,18].forEach(h=>{
+        const[lx,ly]=polar(cx,cy,rMax+16,h*15);
+        const t=svgEl('text',{x:f(lx),y:f(ly),'text-anchor':'middle','dominant-baseline':'central',fill:'#2a4a6a','font-size':'10','font-family':'monospace'});
+        t.textContent=`${h}`;svg.append(t);
+    });
+
+    // arc elements — animated
+    const paths=hourly.map((h,i)=>{
+        const p=svgEl('path',{fill:'none',d:'M0,0'});
+        const isPeak=h.count===peak.count&&peak.count>0;
+        p.setAttribute('fill',isPeak?'#f97316':'#00d4aa');
+        p.setAttribute('opacity', h.count===0?'0':(0.15+0.85*(h.count/maxC)).toFixed(2));
+        if(isPeak)p.setAttribute('filter','url(#cGlow)');
+        svg.append(p);
+        return p;
+    });
+
+    // center dot
+    svg.append(svgEl('circle',{cx,cy,r:'7',fill:'#00d4aa',opacity:'.85'}));
+    svg.append(svgEl('circle',{cx,cy,r:'3',fill:'#020810'}));
+
+    // spring animation
+    let prog=0;
+    const t0=Date.now(),dur=1300;
+    function easeElastic(t){
+        if(t<=0||t>=1)return t;
+        return Math.pow(2,-10*t)*Math.sin((t-.075)*Math.PI*2/.3)+1;
+    }
+    function anim(){
+        prog=easeElastic(Math.min((Date.now()-t0)/dur,1));
+        hourly.forEach((h,i)=>{
+            if(h.count===0)return;
+            const startDeg=i*15+gap/2;
+            const endDeg=startDeg+sweep;
+            const tR=r0+(h.count/maxC)*(rMax-r0);
+            const curR=r0+Math.max(0,(tR-r0)*prog);
+            if(curR>r0+0.5)paths[i].setAttribute('d',arcPath(cx,cy,r0,curR,startDeg,endDeg));
+        });
+        if(prog<0.999)requestAnimationFrame(anim);
+    }
+    requestAnimationFrame(anim);
+
+    // peak info
+    document.getElementById('peakBig').textContent=`${peak.hour}:00`;
+    document.getElementById('peakDesc').textContent=`${peak.count}× in dieser Stunde`;
+
+    // sidebar top-8 hours
+    const top8=[...hourly].sort((a,b)=>b.count-a.count).slice(0,8);
+    const rows=document.getElementById('hourRows');
+    rows.innerHTML=top8.map(h=>{
+        const pct=Math.round(h.count/maxC*100);
+        const col=h.count===peak.count?'#f97316':'#00d4aa';
+        return`<div class="hour-row">
+            <span class="hour-lbl">${h.hour}:00</span>
+            <div class="hour-track"><div class="hour-fill" data-p="${pct}" style="background:${col}"></div></div>
+            <span class="hour-n">${h.count}</span>
+        </div>`;
+    }).join('');
+    setTimeout(()=>rows.querySelectorAll('.hour-fill').forEach(b=>b.style.width=b.dataset.p+'%'),200);
+}
+
+/* ═══════════════════════════════════════ TOP LISTS ══════════════════════════ */
+function buildTopList(id,items,labelFn,barClass){
+    const el=document.getElementById(id);
+    const max=items[0]?.count||1;
+    const medals=['g','s','b'];
+    el.innerHTML=items.slice(0,9).map((it,i)=>{
+        const pct=Math.round(it.count/max*100);
+        return`<div class="top-item">
+            <span class="t-rank ${medals[i]||''}">${i+1}</span>
+            <span class="t-lbl" title="${labelFn(it)}">${labelFn(it)}</span>
+            <div class="t-track"><div class="t-bar ${barClass}" data-p="${pct}"></div></div>
+            <span class="t-n">${it.count}</span>
+        </div>`;
+    }).join('');
+
+    const io=new IntersectionObserver(ent=>{
+        if(!ent[0].isIntersecting)return;
+        el.querySelectorAll('.top-item').forEach((item,i)=>{
+            setTimeout(()=>{
+                item.style.opacity='1';
+                item.style.transform='translateX(0)';
+                item.style.transition='opacity .4s,transform .45s cubic-bezier(.22,.61,.36,1)';
+                const bar=item.querySelector('.t-bar');
+                if(bar)bar.style.width=bar.dataset.p+'%';
+            },i*70);
+        });
+        io.disconnect();
+    },{threshold:.15});
+    io.observe(el);
+}
+
+/* ═══════════════════════════════════════ ROUTE BUBBLES ══════════════════════ */
+function buildRouteBubbles(routes){
+    const wrap=document.getElementById('routeBubbles');
+    const max=routes[0]?.count||1;
+    const minS=52,maxS=130;
+    wrap.innerHTML=routes.slice(0,15).map((r,i)=>{
+        const sz=minS+(r.count/max)*(maxS-minS);
+        const delay=i*45;
+        return`<div class="rb" style="width:${sz}px;height:${sz}px;transition-delay:${delay}ms">
+            <div class="rb-route">${r.origin_airport_iata}→${r.destination_airport_iata}</div>
+            <div class="rb-n">${r.count}×</div>
+        </div>`;
+    }).join('');
+
+    const io=new IntersectionObserver(ent=>{
+        if(!ent[0].isIntersecting)return;
+        wrap.querySelectorAll('.rb').forEach((b,i)=>{
+            setTimeout(()=>{
+                b.style.opacity='1';
+                b.style.transform='scale(1)';
+                b.style.transition='opacity .5s,transform .6s cubic-bezier(.34,1.56,.64,1)';
+            },i*45);
+        });
+        io.disconnect();
+    },{threshold:.1});
+    io.observe(wrap);
+}
+
+/* ═══════════════════════════════════════ HEATMAP ════════════════════════════ */
+function buildHeatmap(hm){
+    const grid=document.getElementById('heatGrid');
+    const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const maxV=Math.max(1,...Object.values(hm));
+    let html='<div></div>';
+    for(let h=0;h<24;h++)html+=`<div class="hm-h">${h}</div>`;
+    for(let d=0;d<7;d++){
+        html+=`<div class="hm-d">${days[d]}</div>`;
+        for(let h=0;h<24;h++){
+            const n=hm[`${d},${h}`]||0;
+            const iv=n/maxV;
+            const bg=n===0?'rgba(255,255,255,.03)'
+                :`rgba(0,${Math.round(70+iv*142)},${Math.round(iv*160)},${(0.08+iv*.92).toFixed(2)})`;
+            const delay=(d*24+h)*6;
+            html+=`<div class="hm-cell" style="background:${bg}" title="${days[d]} ${h}:00 · ${n}×"></div>`;
+        }
+    }
+    grid.innerHTML=html;
+
+    const cells=grid.querySelectorAll('.hm-cell');
+    const io=new IntersectionObserver(ent=>{
+        if(!ent[0].isIntersecting)return;
+        cells.forEach((c,i)=>{
+            setTimeout(()=>{
+                c.classList.add('vis');
+                c.style.opacity='1';
+                c.style.transform='scale(1)';
+            },i*6);
+        });
+        io.disconnect();
+    },{threshold:.05});
+    io.observe(grid);
+}
+
+/* ═══════════════════════════════════════ AREA CHART ═════════════════════════ */
+function buildAreaChart(daily){
+    const svg=document.getElementById('areaSvg');
+    const wrap=document.getElementById('areaWrap');
+    const W=wrap.clientWidth||760;
+    const H=210;
+    svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+    svg.setAttribute('width',W);
+
+    const rev=[...daily].reverse();
+    if(rev.length<2)return;
+    const counts=rev.map(d=>d.count);
+    const maxC=Math.max(...counts,1);
+    const n=counts.length;
+    const pL=36,pR=12,pT=18,pB=36;
+    const cW=W-pL-pR,cH=H-pT-pB;
+    const x=i=>pL+(i/(n-1))*cW;
+    const y=v=>pT+cH-(v/maxC)*cH;
+
+    let out='';
+
+    // grid lines + y labels
+    for(let i=0;i<=4;i++){
+        const yy=pT+(i/4)*cH;
+        const lv=Math.round((1-i/4)*maxC);
+        out+=`<line x1="${pL}" y1="${f(yy)}" x2="${W-pR}" y2="${f(yy)}" stroke="#0c1929" stroke-width="1"/>`;
+        out+=`<text x="${pL-5}" y="${f(yy)}" text-anchor="end" dominant-baseline="central" fill="#2a4a6a" font-size="9" font-family="monospace">${lv}</text>`;
+    }
+
+    // date labels every ~5 days
+    rev.forEach((d,i)=>{
+        if(i%Math.max(1,Math.floor(n/8))!==0&&i!==n-1)return;
+        const[,m,dd]=d.date.split('-');
+        out+=`<text x="${f(x(i))}" y="${H-8}" text-anchor="middle" fill="#2a4a6a" font-size="9" font-family="monospace">${dd}.${m}</text>`;
+    });
+
+    // area path
+    const pts=counts.map((c,i)=>`${f(x(i))},${f(y(c))}`).join(' L');
+    const areaD=`M${f(x(0))},${f(y(0))} L${pts} L${f(x(n-1))},${f(y(0))} Z`;
+    const lineD=`M${pts}`;
+
+    // compute approx path length for dash animation
+    let len=0;
+    for(let i=1;i<n;i++){
+        const dx=x(i)-x(i-1),dy=y(counts[i])-y(counts[i-1]);
+        len+=Math.sqrt(dx*dx+dy*dy);
+    }
+    len=Math.ceil(len)+50;
+
+    // peak dot highlight
+    const pkI=counts.indexOf(Math.max(...counts));
+    const pkX=f(x(pkI)),pkY=f(y(counts[pkI]));
+
+    out+=`<path d="${areaD}" fill="url(#aGrad)" opacity="0">
+        <animate attributeName="opacity" from="0" to="1" dur=".7s" begin="0.5s" fill="freeze"/>
+    </path>`;
+    out+=`<path d="${lineD}" fill="none" stroke="#00d4aa" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#lineGlow)"
+        stroke-dasharray="${len}" stroke-dashoffset="${len}">
+        <animate attributeName="stroke-dashoffset" from="${len}" to="0"
+            dur="1.4s" begin="0.15s" fill="freeze" calcMode="spline"
+            keyTimes="0;1" keySplines="0.22 0.61 0.36 1"/>
+    </path>`;
+
+    // dots
+    counts.forEach((c,i)=>{
+        const isPk=i===pkI;
+        out+=`<circle cx="${f(x(i))}" cy="${f(y(c))}" r="${isPk?5.5:3}"
+            fill="${isPk?'#f97316':'#00d4aa'}"
+            ${isPk?'filter="url(#lineGlow)"':''}
+            opacity="0">
+            <animate attributeName="opacity" from="0" to="1" dur=".2s" begin="${0.8+i*(1.2/n)}s" fill="freeze"/>
+        </circle>`;
+        if(isPk){
+            out+=`<text x="${f(x(i))}" y="${f(y(c)-12)}" text-anchor="middle" fill="#f97316" font-size="10" font-family="monospace" opacity="0">
+                ${c}
+                <animate attributeName="opacity" from="0" to="1" dur=".3s" begin="${1.0+i*(1.2/n)}s" fill="freeze"/>
+            </text>`;
+        }
+    });
+
+    svg.innerHTML+=out;
+}
+
+/* ═══════════════════════════════════════ WEEKDAY RING ═══════════════════════ */
+function buildWeekdayRing(weekdays){
+    const svg=document.getElementById('wdRing');
+    const cx=130,cy=130,r0=45,rMax=108,gap=3,sweep=360/7-gap;
+    const maxC=Math.max(...weekdays.map(w=>w.count),1);
+    const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const colors=['#00d4aa','#00d4aa','#00d4aa','#00d4aa','#00d4aa','#a855f7','#a855f7'];
+
+    const defs=svgEl('defs',{});
+    const flt=svgEl('filter',{id:'wGlow',x:'-30%',y:'-30%',width:'160%',height:'160%'});
+    const gb=svgEl('feGaussianBlur',{stdDeviation:'3',result:'b'});
+    const fm=svgEl('feMerge',{});
+    fm.append(svgEl('feMergeNode',{in:'b'}),svgEl('feMergeNode',{in:'SourceGraphic'}));
+    flt.append(gb,fm);defs.append(flt);svg.append(defs);
+
+    [r0,(r0+rMax)/2,rMax].forEach(r=>{
+        svg.append(svgEl('circle',{cx,cy,r,fill:'none',stroke:'#0c1929','stroke-width':'1'}));
+    });
+
+    const paths=weekdays.map((w,i)=>{
+        const p=svgEl('path',{fill:'none',d:'M0,0'});
+        const isWe=i>=5;
+        p.setAttribute('fill',isWe?'#a855f7':'#00d4aa');
+        p.setAttribute('opacity',(0.15+0.85*(w.count/maxC)).toFixed(2));
+        if(w.count===Math.max(...weekdays.map(x=>x.count)))p.setAttribute('filter','url(#wGlow)');
+        svg.append(p);
+        return p;
+    });
+
+    // day labels
+    weekdays.forEach((_,i)=>{
+        const angleMid=i*(360/7)+gap/2+sweep/2;
+        const[lx,ly]=polar(cx,cy,rMax+14,angleMid);
+        const t=svgEl('text',{x:f(lx),y:f(ly),'text-anchor':'middle','dominant-baseline':'central',
+            fill:'#2a4a6a','font-size':'10','font-family':'sans-serif'});
+        t.textContent=days[i];svg.append(t);
+    });
+
+    svg.append(svgEl('circle',{cx,cy,r:'5',fill:'#00d4aa',opacity:'.8'}));
+
+    let prog=0;const t0=Date.now(),dur=1100;
+    function ease(t){return t<.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1}
+    function anim(){
+        prog=ease(Math.min((Date.now()-t0)/dur,1));
+        weekdays.forEach((w,i)=>{
+            if(w.count===0)return;
+            const a1=i*(360/7)+gap/2;
+            const a2=a1+sweep;
+            const tR=r0+(w.count/maxC)*(rMax-r0);
+            const cR=r0+Math.max(0,(tR-r0)*prog);
+            if(cR>r0+.5)paths[i].setAttribute('d',arcPath(cx,cy,r0,cR,a1,a2));
+        });
+        if(prog<.999)requestAnimationFrame(anim);
+    }
+    const io=new IntersectionObserver(ent=>{
+        if(!ent[0].isIntersecting)return;
+        requestAnimationFrame(anim);io.disconnect();
+    },{threshold:.2});
+    io.observe(svg);
+}
+
+/* ═══════════════════════════════════════ MAIN LOAD ══════════════════════════ */
+async function load(){
+    let d;
+    try{
+        const r=await fetch('/api/stats');
+        d=await r.json();
+        if(d.error)throw new Error(d.error);
+    }catch(e){
+        document.getElementById('heroSub').textContent='Fehler beim Laden der Daten';
+        return;
+    }
+
+    // Hero counter
+    const heroEl=document.getElementById('heroNum');
+    heroEl.textContent='0';
+    setTimeout(()=>countUp(heroEl,d.total,1800),600);
+
+    const days30=d.daily.length;
+    document.getElementById('heroSub').textContent=
+        `${days30} Tage Beobachtungszeitraum · ${d.total.toLocaleString('de')} Überflüge gesamt`;
+
+    // Pills
+    const todayStr=new Date().toISOString().slice(0,10);
+    const tod=d.daily.find(x=>x.date===todayStr);
+    document.getElementById('pToday').textContent=(tod?.count??0).toLocaleString('de');
+
+    const peak=d.hourly.reduce((a,b)=>b.count>a.count?b:a,{hour:0,count:0});
+    document.getElementById('pPeak').textContent=peak.count?`${peak.hour}–${peak.hour+1}h`:'–';
+    document.getElementById('pPeakH').textContent=peak.count?`${peak.count} Flüge`:'';
+
+    if(d.airlines.length){
+        const a=d.airlines[0];
+        document.getElementById('pAirline').textContent=alName(a.airline_iata,a.airline_icao);
+        document.getElementById('pAirlineH').textContent=`${a.count}× gesichtet`;
+    }
+    if(d.aircraft.length){
+        const a=d.aircraft[0];
+        document.getElementById('pAc').textContent=acName(a.aircraft_code);
+        document.getElementById('pAcH').textContent=`${a.count}× gesichtet`;
+    }
+
+    // Visualizations
+    buildRadialClock(d.hourly);
+    buildTopList('topAirlines',d.airlines,r=>alName(r.airline_iata,r.airline_icao),'te');
+    buildTopList('topAircraft',d.aircraft,r=>acName(r.aircraft_code),'pu');
+    buildRouteBubbles(d.routes);
+    buildHeatmap(d.heatmap||{});
+    buildAreaChart(d.daily);
+    buildWeekdayRing(d.weekdays);
+}
+
+load();
+</script>
+</body>
+</html>

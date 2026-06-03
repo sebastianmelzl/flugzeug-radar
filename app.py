@@ -637,6 +637,11 @@ def stats_page():
     return render_template("stats.html")
 
 
+@app.route("/viz")
+def viz_page():
+    return render_template("viz.html")
+
+
 @app.route("/api/flights")
 def get_flights():
     try:
