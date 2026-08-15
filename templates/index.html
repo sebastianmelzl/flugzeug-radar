@@ -1742,19 +1742,51 @@ function decodeVariant(code, typeFull) {
 }
 
 /* ── Sprachausgabe ── */
-const _TTS_D = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun'];
+function isEnglishVoice() {
+    return selectedVoice().startsWith('en-');
+}
+
+const _TTS_D_DE = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun'];
+const _TTS_D_EN = ['zero','one','two','three','four','five','six','seven','eight','nine'];
 function normalizeAircraftForTTS(name) {
     if (!name) return name;
-    // Boeing 7xx model numbers → digit by digit ("787" → "sieben acht sieben")
-    // Airbus A-numbers stay as-is (read naturally as "A dreihundert...")
-    return name.replace(/\b(7\d{2})\b/g, m => [...m].map(c => _TTS_D[+c]).join(' '));
+    // Boeing 7xx model numbers → digit by digit ("787" → "seven eight seven")
+    // Airbus A-numbers stay as-is (read naturally as "A three hundred...")
+    const digits = isEnglishVoice() ? _TTS_D_EN : _TTS_D_DE;
+    return name.replace(/\b(7\d{2})\b/g, m => [...m].map(c => digits[+c]).join(' '));
 }
 
 function acAgePhrase(year) {
     if (!year) return '';
     const age = new Date().getFullYear() - parseInt(year);
     if (age < 0 || age > 80) return '';
-    return `, ${age} Jahre alt`;
+    return isEnglishVoice() ? `, ${age} years old` : `, ${age} Jahre alt`;
+}
+
+// Best-effort real ETA from FR24 (one request, only called right before an announcement);
+// falls back to the server's distance/speed estimate on f.eta_min if it's unavailable.
+async function fetchRealEta(flightId) {
+    try {
+        const r = await fetch(`/api/eta/${flightId}`);
+        if (!r.ok) return null;
+        const d = await r.json();
+        return d.eta_min ?? null;
+    } catch { return null; }
+}
+
+function etaPhrase(minutes) {
+    if (!minutes) return '';
+    const en = isEnglishVoice();
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    let dur;
+    if (h > 0) {
+        dur = en
+            ? `${h} hour${h > 1 ? 's' : ''}${m > 0 ? ` ${m} minute${m > 1 ? 's' : ''}` : ''}`
+            : `${h} Stunde${h > 1 ? 'n' : ''}${m > 0 ? ` ${m} Minute${m > 1 ? 'n' : ''}` : ''}`;
+    } else {
+        dur = en ? `${m} minute${m > 1 ? 's' : ''}` : `${m} Minute${m > 1 ? 'n' : ''}`;
+    }
+    return en ? `, about ${dur} remaining` : `, noch ca. ${dur}`;
 }
 
 function buildSpeechText(f) {
@@ -1764,10 +1796,23 @@ function buildSpeechText(f) {
     const dest   = apName(f.destination_airport_iata);
     const age    = acAgePhrase(f.year);
 
+    const eta = etaPhrase(f.eta_min);
+    if (isEnglishVoice()) {
+        let text = 'Flyover';
+        if (al) text += ` by ${al}`;
+        if (ac) text += `, ${ac}`;
+        text += age;
+        text += eta;
+        if (origin && dest) text += `. From ${origin} to ${dest}.`;
+        else if (dest)      text += `. To ${dest}.`;
+        else                text += '.';
+        return text;
+    }
     let text = 'Überflug';
     if (al) text += ` von ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
+    text += eta;
     if (origin && dest) text += `. Von ${origin} nach ${dest}.`;
     else if (dest)      text += `. Nach ${dest}.`;
     else                text += '.';
@@ -2024,18 +2069,25 @@ async function toggleSpotify() {
 }
 
 async function announce(f) {
+    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
+const _DIRS_DE = ['Norden','Nordosten','Osten','Südosten','Süden','Südwesten','Westen','Nordwesten'];
+const _DIRS_EN = ['North','Northeast','East','Southeast','South','Southwest','West','Northwest'];
+
 function _passoverFromDir(f) {
-    if (isRwy18Departure(f)) return 'von der 18 kommend';
+    const en = isEnglishVoice();
+    if (isRwy18Departure(f)) return en ? 'coming from runway 18' : 'von der 18 kommend';
     if (!f.latitude || !f.longitude) return null;
     const abs = _loungerBearing(f).abs;
-    const dirs = ['Norden','Nordosten','Osten','Südosten','Süden','Südwesten','Westen','Nordwesten'];
-    return 'von ' + dirs[Math.round(abs / 45) % 8];
+    const dirs = en ? _DIRS_EN : _DIRS_DE;
+    const dir = dirs[Math.round(abs / 45) % 8];
+    return en ? `from the ${dir}` : `von ${dir}`;
 }
 
 function buildPassoverText(f) {
+    const en   = isEnglishVoice();
     const al   = airlineName(f.airline_iata, f.airline_icao);
     const ac   = normalizeAircraftForTTS((aircraftName(f.aircraft_code) || f.aircraft_code || '').replace(/-/g, ' '));
     const age  = acAgePhrase(f.year);
@@ -2045,19 +2097,27 @@ function buildPassoverText(f) {
     let text;
     if (isApproaching) {
         // Flight is heading toward user — look straight up; mention where it comes from
-        text = 'Schau nach oben';
+        text = en ? 'Look up' : 'Schau nach oben';
         const dir = _passoverFromDir(f);
         if (dir) text += `, ${dir}`;
     } else {
         // Flight is passing by — tell the user which direction to look
         const abs = _loungerBearing(f).abs;
-        const dirs = ['Norden','Nordosten','Osten','Südosten','Süden','Südwesten','Westen','Nordwesten'];
-        const lookDir = isRwy18Departure(f) ? 'Norden' : dirs[Math.round(abs / 45) % 8];
-        text = `Schau nach ${lookDir}`;
+        const dirs = en ? _DIRS_EN : _DIRS_DE;
+        const lookDir = isRwy18Departure(f) ? (en ? 'North' : 'Norden') : dirs[Math.round(abs / 45) % 8];
+        text = en ? `Look ${lookDir}` : `Schau nach ${lookDir}`;
     }
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
+    text += etaPhrase(f.eta_min);
+    if (en) {
+        if (orig && dest) text += `. From ${orig} to ${dest}.`;
+        else if (dest)    text += `. To ${dest}.`;
+        else if (orig)    text += `. From ${orig}.`;
+        else text += '.';
+        return text;
+    }
     if (orig && dest) text += `. Von ${orig} nach ${dest}.`;
     else if (dest)    text += `. Nach ${dest}.`;
     else if (orig)    text += `. Von ${orig}.`;
@@ -2066,6 +2126,7 @@ function buildPassoverText(f) {
 }
 
 async function announcePassover(f) {
+    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
     speak(buildPassoverText(f), true, 'small');
 }
 
@@ -2112,18 +2173,20 @@ function _passoverDistThresh(f) {
 function _balconyLookDir(f) {
     // Liegestuhl: Blick nach West leicht südlich (~255°)
     // geradeaus=WSW, rechts=NNW, hinten=ONO
+    const en = isEnglishVoice();
     const dLat = f.latitude - userLat;
     const dLon = f.longitude - userLon;
     const bear = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
     const rel  = (bear - 255 + 360) % 360;
-    if (rel < 30 || rel > 330) return 'geradeaus';       // WSW
-    if (rel >= 30  && rel < 75)  return 'rechts vorne';  // NW
-    if (rel >= 75  && rel < 150) return 'direkt rechts'; // N / NNO
-    if (rel >= 150 && rel < 200) return 'rechts hinten'; // NO
-    return 'hinter dir';                                  // O
+    if (rel < 30 || rel > 330) return en ? 'straight ahead' : 'geradeaus';       // WSW
+    if (rel >= 30  && rel < 75)  return en ? 'front right'  : 'rechts vorne';   // NW
+    if (rel >= 75  && rel < 150) return en ? 'directly right' : 'direkt rechts'; // N / NNO
+    if (rel >= 150 && rel < 200) return en ? 'back right'  : 'rechts hinten';   // NO
+    return en ? 'behind you' : 'hinter dir';                                     // O
 }
 
 function buildBalconyText(f) {
+    const en   = isEnglishVoice();
     const al   = airlineName(f.airline_iata, f.airline_icao);
     const ac   = normalizeAircraftForTTS((aircraftName(f.aircraft_code) || f.aircraft_code || '').replace(/-/g, ' '));
     const orig = apName(f.origin_airport_iata);
@@ -2131,10 +2194,18 @@ function buildBalconyText(f) {
     const age  = acAgePhrase(f.year);
     const dir  = _balconyLookDir(f);
     const km   = Math.round(f.distance_km);
-    let text = `Balkonblick, ${dir}, ${km} Kilometer`;
+    let text = en ? `Balcony view, ${dir}, ${km} kilometers` : `Balkonblick, ${dir}, ${km} Kilometer`;
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
+    text += etaPhrase(f.eta_min);
+    if (en) {
+        if (orig && dest) text += `. From ${orig} to ${dest}.`;
+        else if (dest)    text += `. To ${dest}.`;
+        else if (orig)    text += `. From ${orig}.`;
+        else text += '.';
+        return text;
+    }
     if (orig && dest) text += `. Von ${orig} nach ${dest}.`;
     else if (dest)    text += `. Nach ${dest}.`;
     else if (orig)    text += `. Von ${orig}.`;
@@ -2143,6 +2214,7 @@ function buildBalconyText(f) {
 }
 
 async function announceBalcony(f) {
+    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
     speak(buildBalconyText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2152,6 +2224,7 @@ async function speakFlight(id) {
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
+    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 

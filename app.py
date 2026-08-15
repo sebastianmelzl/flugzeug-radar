@@ -293,6 +293,106 @@ threading.Thread(target=_load_ac_database, daemon=True).start()
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# ── Airport coordinate database (OurAirports CSV) — used for remaining-flight-time estimate ──
+_AIRPORT_DB = {}   # IATA code → [lat, lon]
+_AIRPORT_DB_READY = False
+_AIRPORT_DB_LOCK  = threading.Lock()
+_AIRPORT_DB_CACHE = os.path.join(_data_dir, "airport_db_cache.json.gz")
+_AIRPORT_DB_URL   = "https://davidmegginson.github.io/ourairports-data/airports.csv"
+_AIRPORT_DB_MAX_AGE_DAYS = 30
+
+
+def _load_airport_database():
+    global _AIRPORT_DB_READY
+    if os.path.exists(_AIRPORT_DB_CACHE):
+        age = (time.time() - os.path.getmtime(_AIRPORT_DB_CACHE)) / 86400
+        if age < _AIRPORT_DB_MAX_AGE_DAYS:
+            try:
+                with gzip.open(_AIRPORT_DB_CACHE, "rt", encoding="utf-8") as fh:
+                    db = json.load(fh)
+                with _AIRPORT_DB_LOCK:
+                    _AIRPORT_DB.update(db)
+                    _AIRPORT_DB_READY = True
+                print(f"[AirportDB] {len(db):,} records loaded from cache", flush=True)
+                return
+            except Exception as e:
+                print(f"[AirportDB] cache read failed: {e}", flush=True)
+
+    print("[AirportDB] downloading OurAirports database …", flush=True)
+    try:
+        r = requests.get(_AIRPORT_DB_URL, timeout=60, stream=True)
+        if r.status_code != 200:
+            print(f"[AirportDB] download failed: HTTP {r.status_code}", flush=True)
+            return
+        db = {}
+        reader = csv.reader(r.iter_lines(decode_unicode=True))
+        header = next(reader, None)
+        if header is None:
+            return
+        def ci(name):
+            try: return header.index(name)
+            except ValueError: return -1
+        i_iata, i_lat, i_lon = ci("iata_code"), ci("latitude_deg"), ci("longitude_deg")
+        if i_iata < 0 or i_lat < 0 or i_lon < 0:
+            print("[AirportDB] unexpected CSV format", flush=True)
+            return
+        for row in reader:
+            if not row or i_iata >= len(row):
+                continue
+            iata = row[i_iata].strip().strip('"').upper()
+            if not iata:
+                continue
+            try:
+                lat, lon = float(row[i_lat]), float(row[i_lon])
+            except (ValueError, IndexError):
+                continue
+            db[iata] = [lat, lon]
+        with _AIRPORT_DB_LOCK:
+            _AIRPORT_DB.update(db)
+            _AIRPORT_DB_READY = True
+        print(f"[AirportDB] {len(db):,} records loaded from OurAirports", flush=True)
+        try:
+            with gzip.open(_AIRPORT_DB_CACHE, "wt", encoding="utf-8") as fh:
+                json.dump(db, fh)
+            print("[AirportDB] cache saved", flush=True)
+        except Exception as e:
+            print(f"[AirportDB] cache save failed: {e}", flush=True)
+    except Exception as e:
+        print(f"[AirportDB] error: {e}", flush=True)
+
+
+def airport_coords(iata):
+    if not iata:
+        return None
+    with _AIRPORT_DB_LOCK:
+        v = _AIRPORT_DB.get(iata.upper().strip())
+    return (v[0], v[1]) if v else None
+
+
+def estimate_eta_min(f):
+    """Rough remaining-flight-time estimate in minutes: great-circle distance to the
+    destination airport divided by current ground speed. Approximate (straight-line,
+    ignores routing/descent) — good enough for a casual spoken estimate, not for real ETA."""
+    dest = f.get("destination_airport_iata")
+    if not dest or not f.get("latitude") or not f.get("longitude"):
+        return None
+    coords = airport_coords(dest)
+    if not coords:
+        return None
+    speed = f.get("ground_speed_kmh") or 0
+    if speed < 50:  # too slow/stale (taxi, climb-out, data glitch) for a meaningful estimate
+        return None
+    dist = haversine(f["latitude"], f["longitude"], coords[0], coords[1])
+    minutes = round(dist / speed * 60)
+    if minutes <= 0 or minutes > 20 * 60:  # sanity cap ~20h
+        return None
+    return minutes
+
+
+threading.Thread(target=_load_airport_database, daemon=True).start()
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 # ── Per-aircraft metadata cache (SQLite + web fallbacks) ─────────────────────
 _AC_META_DB      = os.path.join(_data_dir, "aircraft_meta.db")
 _AC_META_MAX_AGE = 30 * 86400   # 30 days
@@ -587,6 +687,7 @@ def enrich_flight(f):
     f["msn"]            = (meta or {}).get("serial_no") or csv_row.get("s") or ""
     f["type_name_full"] = (meta or {}).get("type_name") or csv_row.get("m") or ""
     f["operator_full"]  = (meta or {}).get("operator") or csv_row.get("o") or ""
+    f["eta_min"]        = estimate_eta_min(f)
     queue_ac_meta(icao24)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -655,6 +756,40 @@ def get_flights():
         return jsonify({"flights": flights, "count": len(flights), "source": source})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/eta/<flight_id>")
+def get_flight_eta(flight_id):
+    """Best-effort real arrival ETA from FlightRadar24's per-flight detail endpoint.
+    Meant to be called once, right before an announcement fires — not on every poll,
+    to avoid adding load to the already rate-limit-prone FR24 bulk endpoint.
+    Field names follow FR24's known (but undocumented) JSON shape; any anomaly or
+    blocked request just returns eta_min: null so the caller falls back to its own
+    distance/speed estimate."""
+    try:
+        r = requests.get(
+            f"https://data-live.flightradar24.com/clickhandler/?flight={flight_id}",
+            headers={"accept": "application/json", "user-agent": "Mozilla/5.0"},
+            timeout=6,
+        )
+        if r.status_code != 200:
+            return jsonify({"eta_min": None})
+        data = r.json() or {}
+        t = data.get("time") or {}
+        arrival = (
+            (t.get("real") or {}).get("arrival")
+            or (t.get("estimated") or {}).get("arrival")
+            or (t.get("scheduled") or {}).get("arrival")
+        )
+        if not arrival:
+            return jsonify({"eta_min": None})
+        minutes = round((int(arrival) - time.time()) / 60)
+        if minutes <= 0 or minutes > 20 * 60:
+            return jsonify({"eta_min": None})
+        return jsonify({"eta_min": minutes})
+    except Exception as e:
+        print(f"[ETA] {flight_id}: {e}", flush=True)
+        return jsonify({"eta_min": None})
 
 
 @app.route("/api/aircraft/<icao24_hex>")
