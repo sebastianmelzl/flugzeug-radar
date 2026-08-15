@@ -2875,11 +2875,39 @@ function _updateBalconyRadar() {
     });
 }
 
+// Proactively refresh real flight-time for the two big (closest) cards, not just on
+// announcement — but throttled per flight ID so a flight sitting in the top 2 across
+// many polls doesn't get re-fetched every ~10s, only every couple of minutes.
+const _bigCardEtaFetched = new Map(); // flight id → last-attempt timestamp (ms)
+const BIG_CARD_ETA_REFRESH_MS = 120000;
+async function _maybeFetchBigCardEta(f) {
+    const last = _bigCardEtaFetched.get(f.id) || 0;
+    if (Date.now() - last < BIG_CARD_ETA_REFRESH_MS) return;
+    _bigCardEtaFetched.set(f.id, Date.now());
+    const real = await fetchRealEta(f.id, f.callsign);
+    if (!real) return;
+    f.eta_min = real.eta_min;
+    f.eta_source = real.source;
+    f.eta_departed_epoch = real.departed_epoch || null;
+    f.eta_landing_epoch = real.landing_epoch || null;
+    const card = document.getElementById(`card-${f.id}`);
+    if (!card) return;
+    const html = etaBlockHtml(f);
+    const old = card.querySelector('.eta-block');
+    if (old) {
+        old.outerHTML = html || '';
+    } else if (html) {
+        const target = card.querySelector('.bc-stats-row');
+        if (target) target.insertAdjacentHTML('afterend', html);
+    }
+}
+
 function renderFlights(flights, source) {
     const newIds = new Set(flights.map(f => f.id));
     const oldIds = previousIds;
     previousIds = newIds;
     currentFlights = flights;
+    for (const id of _bigCardEtaFetched.keys()) { if (!newIds.has(id)) _bigCardEtaFetched.delete(id); }
 
     document.getElementById('countNum').textContent = flights.length;
     const st = document.getElementById('sourceTag');
@@ -2898,6 +2926,7 @@ function renderFlights(flights, source) {
     const bigCards = main.slice(0, 2);
     const restMain = main.slice(2);
     let html = bigCards.map(f => renderBigCard(f, !oldIds.has(f.id))).join('');
+    bigCards.forEach(_maybeFetchBigCardEta);
     const restAll = [...restMain, ...comp];
     if (restAll.length > 0) {
         const collapsed = _secondaryListCollapsed ? ' collapsed' : '';
