@@ -356,6 +356,23 @@
         .vs-down { color: #f87171; }
         .vs-level{ color: #475569; }
 
+        .eta-block {
+            margin-top: 12px; padding: 10px 12px;
+            background: #0a1120; border: 1px solid #1a2f4a; border-radius: 10px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+        }
+        .eta-block-simple { grid-template-columns: 1fr; }
+        .eta-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .eta-lbl { font-size: 11px; color: #64748b; }
+        .eta-val { font-size: 14px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+        .eta-src {
+            grid-column: 1/-1; margin-top: 2px; font-size: 9px;
+            text-transform: uppercase; letter-spacing: .08em; color: #334155; text-align: right;
+        }
+        body.light .eta-block { background: #f8fafc; border-color: #cbd5e1; }
+        body.light .eta-lbl   { color: #94a3b8; }
+        body.light .eta-src   { color: #94a3b8; }
+
         /* Section 4: Radar */
         .sec-radar {
             width: 150px;
@@ -1765,12 +1782,12 @@ function acAgePhrase(year) {
 
 // Best-effort real ETA from FR24 (one request, only called right before an announcement);
 // falls back to the server's distance/speed estimate on f.eta_min if it's unavailable.
-async function fetchRealEta(flightId) {
+async function fetchRealEta(flightId, callsign) {
     try {
-        const r = await fetch(`/api/eta/${flightId}`);
+        const r = await fetch(`/api/eta/${flightId}?callsign=${encodeURIComponent(callsign || '')}`);
         if (!r.ok) return null;
         const d = await r.json();
-        return d.eta_min ?? null;
+        return d.eta_min ? d : null;  // {eta_min, departed_epoch, landing_epoch, source}
     } catch { return null; }
 }
 
@@ -1795,7 +1812,31 @@ function formatEtaShort(minutes) {
     return h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}`;
 }
 function etaSourceLabel(f) {
-    return f.eta_source === 'fr24' ? 'FR24' : 'geschätzt';
+    if (f.eta_source === 'flightaware') return 'FlightAware';
+    if (f.eta_source === 'fr24') return 'FR24';
+    return 'geschätzt';
+}
+
+// Full progress block (Gestartet/Verstrichen/Restflugzeit/Landung) when we have real
+// departure+arrival timestamps (only after this flight was actually announced at least
+// once — see fetchRealEta); otherwise falls back to a single estimated-remaining value.
+function etaBlockHtml(f) {
+    if (!f.eta_min) return '';
+    const src = etaSourceLabel(f);
+    if (f.eta_departed_epoch && f.eta_landing_epoch) {
+        const elapsedMin = Math.max(0, Math.round((Date.now() / 1000 - f.eta_departed_epoch) / 60));
+        return `<div class="eta-block">
+            <div class="eta-row"><span class="eta-lbl">Gestartet</span><span class="eta-val">${fmtTime(f.eta_departed_epoch) || '–'}</span></div>
+            <div class="eta-row"><span class="eta-lbl">Verstrichen</span><span class="eta-val">${formatEtaShort(elapsedMin)}</span></div>
+            <div class="eta-row"><span class="eta-lbl">Restflugzeit</span><span class="eta-val">${formatEtaShort(f.eta_min)}</span></div>
+            <div class="eta-row"><span class="eta-lbl">Landung ca.</span><span class="eta-val">${fmtTime(f.eta_landing_epoch) || '–'}</span></div>
+            <div class="eta-src">${src}</div>
+        </div>`;
+    }
+    return `<div class="eta-block eta-block-simple">
+        <div class="eta-row"><span class="eta-lbl">Restflugzeit</span><span class="eta-val">${formatEtaShort(f.eta_min)} ${f.eta_min >= 60 ? 'Std' : 'Min'}</span></div>
+        <div class="eta-src">${src}</div>
+    </div>`;
 }
 
 function buildSpeechText(f) {
@@ -2078,8 +2119,13 @@ async function toggleSpotify() {
 }
 
 async function announce(f) {
-    const _realEta = await fetchRealEta(f.id);
-    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
+    const _realEta = await fetchRealEta(f.id, f.callsign);
+    if (_realEta) {
+        f.eta_min = _realEta.eta_min;
+        f.eta_source = _realEta.source;
+        f.eta_departed_epoch = _realEta.departed_epoch || null;
+        f.eta_landing_epoch = _realEta.landing_epoch || null;
+    }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2136,8 +2182,13 @@ function buildPassoverText(f) {
 }
 
 async function announcePassover(f) {
-    const _realEta = await fetchRealEta(f.id);
-    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
+    const _realEta = await fetchRealEta(f.id, f.callsign);
+    if (_realEta) {
+        f.eta_min = _realEta.eta_min;
+        f.eta_source = _realEta.source;
+        f.eta_departed_epoch = _realEta.departed_epoch || null;
+        f.eta_landing_epoch = _realEta.landing_epoch || null;
+    }
     speak(buildPassoverText(f), true, 'small');
 }
 
@@ -2225,8 +2276,13 @@ function buildBalconyText(f) {
 }
 
 async function announceBalcony(f) {
-    const _realEta = await fetchRealEta(f.id);
-    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
+    const _realEta = await fetchRealEta(f.id, f.callsign);
+    if (_realEta) {
+        f.eta_min = _realEta.eta_min;
+        f.eta_source = _realEta.source;
+        f.eta_departed_epoch = _realEta.departed_epoch || null;
+        f.eta_landing_epoch = _realEta.landing_epoch || null;
+    }
     speak(buildBalconyText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2236,8 +2292,13 @@ async function speakFlight(id) {
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
-    const _realEta = await fetchRealEta(f.id);
-    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
+    const _realEta = await fetchRealEta(f.id, f.callsign);
+    if (_realEta) {
+        f.eta_min = _realEta.eta_min;
+        f.eta_source = _realEta.source;
+        f.eta_departed_epoch = _realEta.departed_epoch || null;
+        f.eta_landing_epoch = _realEta.landing_epoch || null;
+    }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2442,12 +2503,8 @@ function renderBigCard(f, isNew) {
                 <div class="bc-stat-val">${f.year || '–'}</div>
                 <div class="bc-stat-lbl">Baujahr</div>
             </div>
-            ${f.eta_min ? `<div class="bc-stat-item">
-                <div class="bc-stat-val">${formatEtaShort(f.eta_min)}</div>
-                <div class="bc-stat-lbl">${f.eta_min >= 60 ? 'Std' : 'Min'} Restflug</div>
-                <div class="bc-stat-lbl" style="opacity:.4">${etaSourceLabel(f)}</div>
-            </div>` : ''}
         </div>
+        ${etaBlockHtml(f)}
 
         ${(() => {
             const spec = f.aircraft_code ? AC_SPECS[f.aircraft_code.toUpperCase()] : null;
@@ -2597,16 +2654,12 @@ function renderCard(f, isNew) {
                     <div class="live-label">Entfernung</div>
                     <div class="live-value"><span class="dist-interp">${_odHtml(f.distance_km)}</span> <span class="live-unit">km</span></div>
                 </div>
-                ${f.eta_min ? `<div>
-                    <div class="live-label">Restflugzeit</div>
-                    <div class="live-value">${formatEtaShort(f.eta_min)} <span class="live-unit">${f.eta_min >= 60 ? 'Std' : 'Min'}</span></div>
-                    <div class="live-sub">${etaSourceLabel(f)}</div>
-                </div>` : ''}
                 <div style="grid-column:1/-1">
                     <div class="live-label">Steigrate</div>
                     <div class="live-value ${vsClass}" style="font-size:16px">${vsIcon} ${vsText}</div>
                 </div>
             </div>
+            ${etaBlockHtml(f)}
         </div>
 
         <!-- Section 4: Radar + approach -->

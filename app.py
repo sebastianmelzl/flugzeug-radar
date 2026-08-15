@@ -5,6 +5,7 @@ import queue as _tts_queue_mod
 import csv
 import gzip
 import json
+import re
 import time
 
 IS_MACOS = sys.platform == "darwin"
@@ -767,14 +768,56 @@ def get_flights():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/eta/<flight_id>")
-def get_flight_eta(flight_id):
+def _fetch_flightaware_eta(callsign):
+    """Best-effort real flight-time info by scraping FlightAware's public flight
+    page — not their official (paid) AeroAPI. The page embeds a `trackpollBootstrap`
+    JSON blob server-side (no JS execution needed), which includes takeoffTimes and
+    landingTimes with real timestamps. Any failure (blocked, format change, flight not
+    found, ambiguous callsign) just returns None.
+    Returns {eta_min, departed_epoch, landing_epoch} or None."""
+    if not callsign:
+        return None
+    try:
+        r = requests.get(
+            f"https://de.flightaware.com/live/flight/{callsign.strip()}",
+            headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"},
+            timeout=8,
+        )
+        if r.status_code != 200:
+            return None
+        m = re.search(r"var trackpollBootstrap\s*=\s*(\{.*\});\s*\n", r.text)
+        if not m:
+            return None
+        data = json.loads(m.group(1))
+        now = time.time()
+        for entry in (data.get("flights") or {}).values():
+            for act in (entry.get("activityLog") or {}).get("flights") or []:
+                if act.get("flightStatus") != "airborne":
+                    continue
+                landing = act.get("landingTimes") or {}
+                takeoff = act.get("takeoffTimes") or {}
+                eta_epoch = landing.get("estimated") or landing.get("scheduled")
+                if not eta_epoch or eta_epoch <= now:
+                    continue
+                minutes = round((eta_epoch - now) / 60)
+                if 0 < minutes <= 20 * 60:
+                    return {
+                        "eta_min": minutes,
+                        "landing_epoch": eta_epoch,
+                        "departed_epoch": takeoff.get("actual") or takeoff.get("estimated") or takeoff.get("scheduled"),
+                    }
+        return None
+    except Exception as e:
+        print(f"[ETA] flightaware {callsign}: {e}", flush=True)
+        return None
+
+
+def _fetch_fr24_eta(flight_id):
     """Best-effort real arrival ETA from FlightRadar24's per-flight detail endpoint.
-    Meant to be called once, right before an announcement fires — not on every poll,
-    to avoid adding load to the already rate-limit-prone FR24 bulk endpoint.
-    Field names follow FR24's known (but undocumented) JSON shape; any anomaly or
-    blocked request just returns eta_min: null so the caller falls back to its own
-    distance/speed estimate."""
+    Currently blocked by a Cloudflare bot challenge for plain server requests (confirmed
+    2026-08-15) — kept as a harmless attempt in case that ever changes.
+    Returns {eta_min, departed_epoch, landing_epoch} or None."""
     try:
         r = requests.get(
             f"https://data-live.flightradar24.com/clickhandler/?flight={flight_id}",
@@ -782,7 +825,7 @@ def get_flight_eta(flight_id):
             timeout=6,
         )
         if r.status_code != 200:
-            return jsonify({"eta_min": None})
+            return None
         data = r.json() or {}
         t = data.get("time") or {}
         arrival = (
@@ -791,14 +834,37 @@ def get_flight_eta(flight_id):
             or (t.get("scheduled") or {}).get("arrival")
         )
         if not arrival:
-            return jsonify({"eta_min": None})
+            return None
         minutes = round((int(arrival) - time.time()) / 60)
-        if minutes <= 0 or minutes > 20 * 60:
-            return jsonify({"eta_min": None})
-        return jsonify({"eta_min": minutes})
+        if not (0 < minutes <= 20 * 60):
+            return None
+        departure = (
+            (t.get("real") or {}).get("departure")
+            or (t.get("estimated") or {}).get("departure")
+            or (t.get("scheduled") or {}).get("departure")
+        )
+        return {"eta_min": minutes, "landing_epoch": int(arrival), "departed_epoch": departure}
     except Exception as e:
-        print(f"[ETA] {flight_id}: {e}", flush=True)
-        return jsonify({"eta_min": None})
+        print(f"[ETA] fr24 {flight_id}: {e}", flush=True)
+        return None
+
+
+@app.route("/api/eta/<flight_id>")
+def get_flight_eta(flight_id):
+    """Best-effort real flight-time info, tried in order: FlightAware page scrape,
+    then FlightRadar24 detail endpoint. Meant to be called once, right before an
+    announcement fires — not on every poll. Returns eta_min: null (falls back to the
+    caller's own distance/speed estimate) if both sources come up empty."""
+    callsign = request.args.get("callsign", "")
+    result = _fetch_flightaware_eta(callsign)
+    if result:
+        result["source"] = "flightaware"
+        return jsonify(result)
+    result = _fetch_fr24_eta(flight_id)
+    if result:
+        result["source"] = "fr24"
+        return jsonify(result)
+    return jsonify({"eta_min": None})
 
 
 @app.route("/api/aircraft/<icao24_hex>")
