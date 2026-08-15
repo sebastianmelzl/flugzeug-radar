@@ -5,7 +5,6 @@ import queue as _tts_queue_mod
 import csv
 import gzip
 import json
-import re
 import time
 
 IS_MACOS = sys.platform == "darwin"
@@ -786,10 +785,16 @@ def _fetch_flightaware_eta(callsign):
         )
         if r.status_code != 200:
             return None
-        m = re.search(r"var trackpollBootstrap\s*=\s*(\{.*\});\s*\n", r.text)
-        if not m:
+        start = r.text.find("var trackpollBootstrap")
+        if start == -1:
             return None
-        data = json.loads(m.group(1))
+        brace = r.text.find("{", r.text.find("=", start))
+        if brace == -1:
+            return None
+        # raw_decode parses one JSON value starting at `brace` and stops there —
+        # robust regardless of what follows on the line (regex on a trailing
+        # ";\n" was too fragile: not every page has a newline right after it).
+        data, _ = json.JSONDecoder().raw_decode(r.text, brace)
         now = time.time()
         for entry in (data.get("flights") or {}).values():
             for act in (entry.get("activityLog") or {}).get("flights") or []:
