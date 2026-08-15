@@ -695,6 +695,7 @@ def enrich_flight(f):
     f["msn"]            = (meta or {}).get("serial_no") or csv_row.get("s") or ""
     f["type_name_full"] = (meta or {}).get("type_name") or csv_row.get("m") or ""
     f["operator_full"]  = (meta or {}).get("operator") or csv_row.get("o") or ""
+    f["photo_url"]      = (meta or {}).get("photo_url") or ""
     f["eta_min"]        = estimate_eta_min(f)
     f["eta_source"]     = "estimate" if f["eta_min"] else None
     queue_ac_meta(icao24)

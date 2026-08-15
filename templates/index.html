@@ -110,12 +110,37 @@
             border-radius: 14px;
             margin-bottom: 14px;
             display: flex;
-            align-items: stretch;
+            flex-direction: column;
             overflow: hidden;
             transition: border-color .2s, transform .2s, box-shadow .2s;
             position: relative;
         }
         .card:hover { border-color: #00d4aa44; transform: translateY(-1px); box-shadow: 0 4px 16px -4px #0008; }
+        .card-body {
+            display: flex;
+            align-items: stretch;
+            flex: 1;
+            min-width: 0;
+        }
+        .card-photo {
+            position: relative;
+            width: 100%;
+            height: 150px;
+            flex-shrink: 0;
+            background: #060a14;
+            overflow: hidden;
+        }
+        .card-photo img {
+            width: 100%; height: 100%;
+            object-fit: cover; display: block;
+        }
+        .card-photo::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, transparent 45%, var(--bg-card) 100%);
+            pointer-events: none;
+        }
+        body.light .card-photo { background: #e2e8f0; }
         .card.new-flight {
             border-color: #00d4aa;
             animation: flashIn .8s ease;
@@ -800,7 +825,8 @@
             .status-bar { margin-bottom: 12px; }
 
             /* ── Regular cards: vertikal stapeln ── */
-            .card { flex-direction: column; overflow: hidden; }
+            .card-body { flex-direction: column; }
+            .card-photo { height: 110px; }
             .sec, .sec-identity, .sec-route, .sec-live {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -2569,9 +2595,17 @@ function renderCard(f, isNew) {
 
     const mil = isMilitary(f);
     const speakBtn = '<button class="speak-btn" onclick="speakFlight(\'' + f.id + '\')" title="Vorlesen">🔊</button>';
+    const photoHTML = f.photo_url ? `
+        <div class="card-photo">
+            <img src="${f.photo_url}" alt="${acModel || f.registration || 'Flugzeug'}" loading="lazy"
+                 onerror="this.parentElement.style.display='none'">
+        </div>` : '';
+
     return `
     <div class="card ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''} ${mil?'military':''}" id="card-${f.id}">
         ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew?'<span class="new-tag">NEU</span>':'')}
+        ${photoHTML}
+        <div class="card-body">
 
         <!-- Section 1: Identity -->
         <div class="sec sec-identity">
@@ -2670,6 +2704,7 @@ function renderCard(f, isNew) {
             <button class="info-btn" onclick="openInfoModal('${f.id}')" title="Flugzeuginfo">ℹ</button>
             ${f.registration ? `<a class="fr24-btn" href="https://www.flightradar24.com/data/aircraft/${f.registration.toLowerCase()}#" target="_blank" rel="noreferrer" title="FlightRadar24">FR24 ↗</a>` : ''}
             ${f.icao24 ? `<a class="fr24-btn" href="https://globe.adsbexchange.com/?icao=${f.icao24.toUpperCase()}&zoom=11" target="_blank" title="ADS-B Exchange">ADSB ↗</a>` : ''}
+        </div>
         </div>
     </div>`;
 }
