@@ -929,6 +929,7 @@ ALLOWED_VOICES = {
     "de-DE-KatjaNeural", "de-DE-AmalaNeural", "de-DE-MajaNeural",
     "de-DE-SeraphinaNeural", "de-DE-ConradNeural", "de-DE-KillianNeural",
     "de-DE-RalfNeural", "de-AT-IngridNeural", "de-AT-JonasNeural", "de-CH-LeniNeural",
+    "en-US-AvaMultilingualNeural", "en-US-AndrewMultilingualNeural",
 }
 DEFAULT_VOICE = "de-CH-LeniNeural"
 
