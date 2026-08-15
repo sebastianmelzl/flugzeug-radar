@@ -2464,10 +2464,16 @@ function renderBigCard(f, isNew) {
     ].join('') : '';
     const speakBtnHTML = `<button class="speak-btn" onclick="speakFlight('${f.id}')" title="Vorlesen" style="width:36px;height:32px;margin:0">🔊</button>`;
     const infoBtnHTML = `<button class="info-btn" onclick="openInfoModal('${f.id}')" title="Flugzeuginfo">ℹ</button>`;
+    const photoHTML = f.photo_url ? `
+        <div class="card-photo">
+            <img src="${f.photo_url}" alt="${acModel || f.registration || 'Flugzeug'}" loading="lazy"
+                 onerror="this.parentElement.style.display='none'">
+        </div>` : '';
 
     return `
     <div class="bigcard ${isNew?'new-flight':''} ${f.distance_km<=3?'overhead':''} ${mil?'military':''}" id="card-${f.id}">
         ${f.distance_km<=3 ? '<span class="overhead-tag">⬆ DIREKT ÜBER DIR</span>' : (isNew ? '<span class="new-tag">NEU</span>' : '')}
+        ${photoHTML}
 
         <div class="bc-header">
             <div class="bc-id-block">
