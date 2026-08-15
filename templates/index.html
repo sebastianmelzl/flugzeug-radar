@@ -365,6 +365,7 @@
         .eta-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
         .eta-lbl { font-size: 11px; color: #64748b; }
         .eta-val { font-size: 14px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+        .eta-unit { font-size: 10px; font-weight: 400; color: #64748b; font-family: var(--font-ui); }
         .eta-src {
             grid-column: 1/-1; margin-top: 2px; font-size: 9px;
             text-transform: uppercase; letter-spacing: .08em; color: #334155; text-align: right;
@@ -1846,8 +1847,8 @@ function etaBlockHtml(f) {
         const elapsedMin = Math.max(0, Math.round((Date.now() / 1000 - f.eta_departed_epoch) / 60));
         return `<div class="eta-block">
             <div class="eta-row"><span class="eta-lbl">Gestartet</span><span class="eta-val">${fmtTime(f.eta_departed_epoch) || '–'}</span></div>
-            <div class="eta-row"><span class="eta-lbl">Verstrichen</span><span class="eta-val">${formatEtaShort(elapsedMin)}</span></div>
-            <div class="eta-row"><span class="eta-lbl">Restflugzeit</span><span class="eta-val">${formatEtaShort(f.eta_min)}</span></div>
+            <div class="eta-row"><span class="eta-lbl">Verstrichen</span><span class="eta-val">${formatEtaShort(elapsedMin)} <span class="eta-unit">${elapsedMin >= 60 ? 'Std' : 'Min'}</span></span></div>
+            <div class="eta-row"><span class="eta-lbl">Restflugzeit</span><span class="eta-val">${formatEtaShort(f.eta_min)} <span class="eta-unit">${f.eta_min >= 60 ? 'Std' : 'Min'}</span></span></div>
             <div class="eta-row"><span class="eta-lbl">Landung ca.</span><span class="eta-val">${fmtTime(f.eta_landing_epoch) || '–'}</span></div>
             <div class="eta-src">${src}</div>
         </div>`;
