@@ -79,10 +79,13 @@
             border-radius: 8px; font-size: 13px; cursor: pointer;
         }
 
+        /* Mobile-only fallback live indicator — .meta (LIVE label + dot) is hidden below 700px */
         .pulse {
+            display: none;
             width: 9px; height: 9px; border-radius: 50%;
             background: var(--accent); animation: pulse 2s infinite;
         }
+
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
 
         main { padding: 10px 16px 16px; }
@@ -631,7 +634,12 @@
         .secondary-list-title {
             font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
             color: #1e3a5f; font-weight: 600; margin-bottom: 8px; padding-left: 2px;
+            display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;
+            transition: color .15s;
         }
+        .secondary-list-title:hover { color: var(--accent); }
+        .secondary-list-chevron { width: 11px; height: 11px; flex-shrink: 0; transition: transform .2s; }
+        .secondary-list-title.collapsed .secondary-list-chevron { transform: rotate(-90deg); }
 
         .bc-specs-row {
             display: flex; flex-wrap: wrap; gap: 5px;
@@ -679,6 +687,7 @@
         body.light .bc-stat-val { color: #0f172a; }
         body.light .bc-stat-lbl { color: #94a3b8; }
         body.light .secondary-list-title { color: #cbd5e1; }
+        body.light .secondary-list-title:hover { color: #0284c7; }
 
         /* ── Info Modal ── */
         .info-modal-overlay {
@@ -761,7 +770,7 @@
             .controls { flex: 0 0 auto; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
             #voiceSelect { display: none; }
             .meta { display: none; }
-            .pulse { width: 7px; height: 7px; }
+            .pulse { display: block; width: 7px; height: 7px; }
             .map-btn { padding: 6px 8px; font-size: 12px; min-height: 34px; }
             select { padding: 6px 7px; font-size: 12px; min-height: 34px; }
 
@@ -943,6 +952,15 @@ let announcedOverhead = new Set();
 let announcedBalcony  = new Set();
 let currentFlights = [];
 let _prevAnnouncementIds = new Set();
+let _secondaryListCollapsed = localStorage.getItem('secondaryListCollapsed') === 'true';
+function toggleSecondaryList() {
+    _secondaryListCollapsed = !_secondaryListCollapsed;
+    try { localStorage.setItem('secondaryListCollapsed', _secondaryListCollapsed); } catch(e) {}
+    const items = document.querySelector('.secondary-list-items');
+    const title = document.querySelector('.secondary-list-title');
+    if (items) items.style.display = _secondaryListCollapsed ? 'none' : '';
+    if (title) title.classList.toggle('collapsed', _secondaryListCollapsed);
+}
 let _map = null, _markers = {}, _markerSigs = {}, _destLines = {}, _selectedFlight = null, _selectedDestLL = null, _selectedDestIata = null, _destMarker = null, _tileLayer = null;
 const _rwy18Stars = new Set(); // flight ids that should show a star (rwy18 + eastern dest)
 let _mapFirstUpdate = true;   // suppress rwy18 chime on initial data load
@@ -2729,10 +2747,18 @@ function renderFlights(flights, source) {
     const bigCards = main.slice(0, 2);
     const restMain = main.slice(2);
     let html = bigCards.map(f => renderBigCard(f, !oldIds.has(f.id))).join('');
-    if (restMain.length > 0 || comp.length > 0) {
-        html += '<div class="secondary-list"><div class="secondary-list-title">Weitere Flugzeuge</div>';
-        html += [...restMain, ...comp].map(f => renderCard(f, false)).join('');
-        html += '</div>';
+    const restAll = [...restMain, ...comp];
+    if (restAll.length > 0) {
+        const collapsed = _secondaryListCollapsed ? ' collapsed' : '';
+        html += `<div class="secondary-list">
+            <div class="secondary-list-title${collapsed}" onclick="toggleSecondaryList()">
+                <svg class="secondary-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                Weitere Flugzeuge (${restAll.length})
+            </div>
+            <div class="secondary-list-items" style="display:${_secondaryListCollapsed ? 'none' : ''}">
+                ${restAll.map(f => renderCard(f, false)).join('')}
+            </div>
+        </div>`;
     }
     list.innerHTML = html;
     try { renderBalconyRadar(); } catch(e) { console.warn('balconyRadar:', e); }
