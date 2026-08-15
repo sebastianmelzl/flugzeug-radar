@@ -1764,13 +1764,32 @@ function isEnglishVoice() {
 }
 
 const _TTS_D_DE = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun'];
-const _TTS_D_EN = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+// ICAO/ATC radiotelephony digit pronunciation — English mode doubles as ATC phraseology mode
+const _ATC_D = ['zero','one','two','tree','four','fife','six','seven','eight','niner'];
+const _NATO = {A:'Alpha',B:'Bravo',C:'Charlie',D:'Delta',E:'Echo',F:'Foxtrot',G:'Golf',H:'Hotel',
+    I:'India',J:'Juliett',K:'Kilo',L:'Lima',M:'Mike',N:'November',O:'Oscar',P:'Papa',Q:'Quebec',
+    R:'Romeo',S:'Sierra',T:'Tango',U:'Uniform',V:'Victor',W:'Whiskey',X:'X-ray',Y:'Yankee',Z:'Zulu'};
+
 function normalizeAircraftForTTS(name) {
     if (!name) return name;
-    // Boeing 7xx model numbers → digit by digit ("787" → "seven eight seven")
+    // Boeing 7xx model numbers → digit by digit ("787" → "seven eight seven" / ATC "seven eight seven")
     // Airbus A-numbers stay as-is (read naturally as "A three hundred...")
-    const digits = isEnglishVoice() ? _TTS_D_EN : _TTS_D_DE;
+    const digits = isEnglishVoice() ? _ATC_D : _TTS_D_DE;
     return name.replace(/\b(7\d{2})\b/g, m => [...m].map(c => digits[+c]).join(' '));
+}
+
+// Callsign/registration spelled ATC-style: letters → NATO alphabet, digits → ATC digit words
+function atcSpell(str) {
+    if (!str) return '';
+    return [...String(str).toUpperCase()].map(c => {
+        if (/[0-9]/.test(c)) return _ATC_D[+c];
+        return _NATO[c] || '';
+    }).filter(Boolean).join(' ');
+}
+
+// Plain number in ATC digit-by-digit style (distances, minutes, ...)
+function atcNumber(n) {
+    return String(n).split('').map(c => /[0-9]/.test(c) ? _ATC_D[+c] : c).join(' ');
 }
 
 function acAgePhrase(year) {
@@ -1803,7 +1822,7 @@ function etaPhrase(minutes) {
     } else {
         dur = en ? `${m} minute${m > 1 ? 's' : ''}` : `${m} Minute${m > 1 ? 'n' : ''}`;
     }
-    return en ? `, about ${dur} remaining` : `, noch ca. ${dur}`;
+    return en ? `, estimate ${dur} to destination` : `, noch ca. ${dur}`;
 }
 
 // Compact card display (not spoken): "1:20" or "45", plus a source label
@@ -1848,13 +1867,16 @@ function buildSpeechText(f) {
 
     const eta = etaPhrase(f.eta_min);
     if (isEnglishVoice()) {
-        let text = 'Flyover';
-        if (al) text += ` by ${al}`;
+        const identRaw = f.flight_number || (f.callsign ? f.callsign.replace(/^[A-Za-z]+/, '') : '');
+        const ident = identRaw ? atcNumber(identRaw) : '';
+        let text = 'Traffic';
+        if (al) text += `, ${al}`;
+        if (ident) text += ` ${ident}`;
         if (ac) text += `, ${ac}`;
         text += age;
         text += eta;
-        if (origin && dest) text += `. From ${origin} to ${dest}.`;
-        else if (dest)      text += `. To ${dest}.`;
+        if (origin && dest) text += `. Route ${origin} to ${dest}.`;
+        else if (dest)      text += `. Inbound ${dest}.`;
         else                text += '.';
         return text;
     }
@@ -2121,10 +2143,8 @@ async function toggleSpotify() {
 async function announce(f) {
     const _realEta = await fetchRealEta(f.id, f.callsign);
     if (_realEta) {
-        f.eta_min = _realEta.eta_min;
-        f.eta_source = _realEta.source;
-        f.eta_departed_epoch = _realEta.departed_epoch || null;
-        f.eta_landing_epoch = _realEta.landing_epoch || null;
+        _cacheRealEta(f.id, _realEta);
+        _applyEtaCache(f);
     }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
@@ -2153,7 +2173,7 @@ function buildPassoverText(f) {
     let text;
     if (isApproaching) {
         // Flight is heading toward user — look straight up; mention where it comes from
-        text = en ? 'Look up' : 'Schau nach oben';
+        text = en ? 'Traffic, overhead' : 'Schau nach oben';
         const dir = _passoverFromDir(f);
         if (dir) text += `, ${dir}`;
     } else {
@@ -2161,15 +2181,15 @@ function buildPassoverText(f) {
         const abs = _loungerBearing(f).abs;
         const dirs = en ? _DIRS_EN : _DIRS_DE;
         const lookDir = isRwy18Departure(f) ? (en ? 'North' : 'Norden') : dirs[Math.round(abs / 45) % 8];
-        text = en ? `Look ${lookDir}` : `Schau nach ${lookDir}`;
+        text = en ? `Traffic, ${lookDir}` : `Schau nach ${lookDir}`;
     }
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
     text += etaPhrase(f.eta_min);
     if (en) {
-        if (orig && dest) text += `. From ${orig} to ${dest}.`;
-        else if (dest)    text += `. To ${dest}.`;
+        if (orig && dest) text += `. Route ${orig} to ${dest}.`;
+        else if (dest)    text += `. Inbound ${dest}.`;
         else if (orig)    text += `. From ${orig}.`;
         else text += '.';
         return text;
@@ -2184,10 +2204,8 @@ function buildPassoverText(f) {
 async function announcePassover(f) {
     const _realEta = await fetchRealEta(f.id, f.callsign);
     if (_realEta) {
-        f.eta_min = _realEta.eta_min;
-        f.eta_source = _realEta.source;
-        f.eta_departed_epoch = _realEta.departed_epoch || null;
-        f.eta_landing_epoch = _realEta.landing_epoch || null;
+        _cacheRealEta(f.id, _realEta);
+        _applyEtaCache(f);
     }
     speak(buildPassoverText(f), true, 'small');
 }
@@ -2256,14 +2274,14 @@ function buildBalconyText(f) {
     const age  = acAgePhrase(f.year);
     const dir  = _balconyLookDir(f);
     const km   = Math.round(f.distance_km);
-    let text = en ? `Balcony view, ${dir}, ${km} kilometers` : `Balkonblick, ${dir}, ${km} Kilometer`;
+    let text = en ? `Traffic, ${dir}, ${atcNumber(km)} kilometers` : `Balkonblick, ${dir}, ${km} Kilometer`;
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
     text += etaPhrase(f.eta_min);
     if (en) {
-        if (orig && dest) text += `. From ${orig} to ${dest}.`;
-        else if (dest)    text += `. To ${dest}.`;
+        if (orig && dest) text += `. Route ${orig} to ${dest}.`;
+        else if (dest)    text += `. Inbound ${dest}.`;
         else if (orig)    text += `. From ${orig}.`;
         else text += '.';
         return text;
@@ -2278,10 +2296,8 @@ function buildBalconyText(f) {
 async function announceBalcony(f) {
     const _realEta = await fetchRealEta(f.id, f.callsign);
     if (_realEta) {
-        f.eta_min = _realEta.eta_min;
-        f.eta_source = _realEta.source;
-        f.eta_departed_epoch = _realEta.departed_epoch || null;
-        f.eta_landing_epoch = _realEta.landing_epoch || null;
+        _cacheRealEta(f.id, _realEta);
+        _applyEtaCache(f);
     }
     speak(buildBalconyText(f), true, chimeTypeForFlight(f));
 }
@@ -2294,10 +2310,8 @@ async function speakFlight(id) {
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
     const _realEta = await fetchRealEta(f.id, f.callsign);
     if (_realEta) {
-        f.eta_min = _realEta.eta_min;
-        f.eta_source = _realEta.source;
-        f.eta_departed_epoch = _realEta.departed_epoch || null;
-        f.eta_landing_epoch = _realEta.landing_epoch || null;
+        _cacheRealEta(f.id, _realEta);
+        _applyEtaCache(f);
     }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
@@ -2875,6 +2889,33 @@ function _updateBalconyRadar() {
     });
 }
 
+// Real ETA (FlightAware/FR24) survives across polls even though the server sends a
+// brand-new flight object every ~10s (which only ever carries the plain estimate).
+// We cache the fixed departure/landing timestamps per flight id — not the minute
+// count itself, which would go stale — and recompute eta_min fresh from them
+// whenever a new flight object for that id comes in. See _applyEtaCache.
+const _etaCache = new Map(); // flight id → {departed_epoch, landing_epoch, source}
+
+function _cacheRealEta(id, real) {
+    if (!real || !real.landing_epoch) return;
+    _etaCache.set(id, {
+        departed_epoch: real.departed_epoch || null,
+        landing_epoch: real.landing_epoch,
+        source: real.source,
+    });
+}
+
+function _applyEtaCache(f) {
+    const c = _etaCache.get(f.id);
+    if (!c) return;
+    const now = Date.now() / 1000;
+    if (c.landing_epoch <= now) { _etaCache.delete(f.id); return; } // already landed — stale
+    f.eta_min = Math.round((c.landing_epoch - now) / 60);
+    f.eta_source = c.source;
+    f.eta_departed_epoch = c.departed_epoch;
+    f.eta_landing_epoch = c.landing_epoch;
+}
+
 // Proactively refresh real flight-time for the two big (closest) cards, not just on
 // announcement — but throttled per flight ID so a flight sitting in the top 2 across
 // many polls doesn't get re-fetched every ~10s, only every couple of minutes.
@@ -2886,10 +2927,8 @@ async function _maybeFetchBigCardEta(f) {
     _bigCardEtaFetched.set(f.id, Date.now());
     const real = await fetchRealEta(f.id, f.callsign);
     if (!real) return;
-    f.eta_min = real.eta_min;
-    f.eta_source = real.source;
-    f.eta_departed_epoch = real.departed_epoch || null;
-    f.eta_landing_epoch = real.landing_epoch || null;
+    _cacheRealEta(f.id, real);
+    _applyEtaCache(f);
     const card = document.getElementById(`card-${f.id}`);
     if (!card) return;
     const html = etaBlockHtml(f);
@@ -2907,6 +2946,7 @@ function renderFlights(flights, source) {
     const oldIds = previousIds;
     previousIds = newIds;
     currentFlights = flights;
+    flights.forEach(_applyEtaCache);
     for (const id of _bigCardEtaFetched.keys()) { if (!newIds.has(id)) _bigCardEtaFetched.delete(id); }
 
     document.getElementById('countNum').textContent = flights.length;
