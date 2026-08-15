@@ -1789,6 +1789,15 @@ function etaPhrase(minutes) {
     return en ? `, about ${dur} remaining` : `, noch ca. ${dur}`;
 }
 
+// Compact card display (not spoken): "1:20" or "45", plus a source label
+function formatEtaShort(minutes) {
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}`;
+}
+function etaSourceLabel(f) {
+    return f.eta_source === 'fr24' ? 'FR24' : 'geschätzt';
+}
+
 function buildSpeechText(f) {
     const al     = airlineName(f.airline_iata, f.airline_icao);
     const ac     = normalizeAircraftForTTS((aircraftName(f.aircraft_code) || f.aircraft_code || '').replace(/-/g, ' '));
@@ -2069,7 +2078,8 @@ async function toggleSpotify() {
 }
 
 async function announce(f) {
-    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
+    const _realEta = await fetchRealEta(f.id);
+    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2126,7 +2136,8 @@ function buildPassoverText(f) {
 }
 
 async function announcePassover(f) {
-    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
+    const _realEta = await fetchRealEta(f.id);
+    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
     speak(buildPassoverText(f), true, 'small');
 }
 
@@ -2214,7 +2225,8 @@ function buildBalconyText(f) {
 }
 
 async function announceBalcony(f) {
-    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
+    const _realEta = await fetchRealEta(f.id);
+    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
     speak(buildBalconyText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2224,7 +2236,8 @@ async function speakFlight(id) {
     if (!f) return;
     const btn = document.querySelector(`#card-${id} .speak-btn`);
     if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 6000); }
-    f.eta_min = (await fetchRealEta(f.id)) ?? f.eta_min;
+    const _realEta = await fetchRealEta(f.id);
+    if (_realEta) { f.eta_min = _realEta; f.eta_source = 'fr24'; }
     speak(buildSpeechText(f), true, chimeTypeForFlight(f));
 }
 
@@ -2429,6 +2442,11 @@ function renderBigCard(f, isNew) {
                 <div class="bc-stat-val">${f.year || '–'}</div>
                 <div class="bc-stat-lbl">Baujahr</div>
             </div>
+            ${f.eta_min ? `<div class="bc-stat-item">
+                <div class="bc-stat-val">${formatEtaShort(f.eta_min)}</div>
+                <div class="bc-stat-lbl">${f.eta_min >= 60 ? 'Std' : 'Min'} Restflug</div>
+                <div class="bc-stat-lbl" style="opacity:.4">${etaSourceLabel(f)}</div>
+            </div>` : ''}
         </div>
 
         ${(() => {
@@ -2579,6 +2597,11 @@ function renderCard(f, isNew) {
                     <div class="live-label">Entfernung</div>
                     <div class="live-value"><span class="dist-interp">${_odHtml(f.distance_km)}</span> <span class="live-unit">km</span></div>
                 </div>
+                ${f.eta_min ? `<div>
+                    <div class="live-label">Restflugzeit</div>
+                    <div class="live-value">${formatEtaShort(f.eta_min)} <span class="live-unit">${f.eta_min >= 60 ? 'Std' : 'Min'}</span></div>
+                    <div class="live-sub">${etaSourceLabel(f)}</div>
+                </div>` : ''}
                 <div style="grid-column:1/-1">
                     <div class="live-label">Steigrate</div>
                     <div class="live-value ${vsClass}" style="font-size:16px">${vsIcon} ${vsText}</div>
