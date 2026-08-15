@@ -407,6 +407,7 @@ _AC_META_MAX_AGE = 30 * 86400   # 30 days
 _AC_META_QUEUED  = set()        # icao24s queued this session (avoids duplicates)
 _AC_META_QUEUE   = []
 _AC_META_Q_LOCK  = threading.Lock()
+_AC_META_LIVE_REG = {}          # icao24 -> registration seen live (hexdb/adsbdb fallback)
 
 
 def _init_aircraft_meta_db():
@@ -530,7 +531,7 @@ def _fetch_planespotters(registration):
         r = requests.get(
             f"https://api.planespotters.net/pub/photos/reg/{registration}",
             timeout=8,
-            headers={"User-Agent": "FlugzeugRadar/1.0"}
+            headers={"User-Agent": "FlugzeugRadar/1.0 (+https://flugzeug-radar-production.up.railway.app)"}
         )
         if r.status_code != 200:
             return None
@@ -604,7 +605,7 @@ def _fetch_wikimedia_photo(registration):
     return None
 
 
-def _do_fetch_meta(icao24):
+def _do_fetch_meta(icao24, fallback_registration=None):
     result = {k: "" for k in (
         "registration", "type_code", "type_name", "serial_no",
         "year", "first_flight", "operator", "source", "photo_url", "country"
@@ -621,6 +622,13 @@ def _do_fetch_meta(icao24):
         for k in ("registration", "type_code", "type_name", "operator", "photo_url", "country"):
             if ad.get(k) and not result.get(k):
                 result[k] = ad[k]
+
+    # Neither hexdb nor adsbdb know this aircraft (common for smaller/newer registrations) —
+    # fall back to the registration already seen live via ADS-B tracking so we can still
+    # try photo lookups below.
+    if not result.get("registration") and fallback_registration:
+        result["registration"] = fallback_registration
+        result.setdefault("source", "adsb_live")
 
     # planespotters: year, MSN, photo fallback
     if result.get("registration") and (not result.get("year") or not result.get("serial_no") or not result.get("photo_url")):
@@ -664,8 +672,13 @@ def _ac_meta_worker():
         if icao24:
             try:
                 cached = _db_get_meta(icao24)
-                if not (cached and time.time() - cached.get("fetched_at", 0) < _AC_META_MAX_AGE):
-                    _do_fetch_meta(icao24)
+                # Only treat a cached row as "done" if it actually resolved a registration —
+                # empty misses (aircraft unknown to hexdb/adsbdb) get retried, since the
+                # fallback registration seen live may let a later attempt succeed.
+                is_fresh = (cached and cached.get("registration")
+                            and time.time() - cached.get("fetched_at", 0) < _AC_META_MAX_AGE)
+                if not is_fresh:
+                    _do_fetch_meta(icao24, fallback_registration=_AC_META_LIVE_REG.get(icao24))
             except Exception as e:
                 print(f"[AcMeta] worker: {e}", flush=True)
             time.sleep(0.5)  # gentle rate limit
@@ -676,10 +689,12 @@ def _ac_meta_worker():
 threading.Thread(target=_ac_meta_worker, daemon=True).start()
 
 
-def queue_ac_meta(icao24):
+def queue_ac_meta(icao24, registration=None):
     if not icao24:
         return
     k = icao24.lower().strip()
+    if registration:
+        _AC_META_LIVE_REG[k] = registration
     with _AC_META_Q_LOCK:
         if k not in _AC_META_QUEUED:
             _AC_META_QUEUED.add(k)
@@ -698,7 +713,7 @@ def enrich_flight(f):
     f["photo_url"]      = (meta or {}).get("photo_url") or ""
     f["eta_min"]        = estimate_eta_min(f)
     f["eta_source"]     = "estimate" if f["eta_min"] else None
-    queue_ac_meta(icao24)
+    queue_ac_meta(icao24, f.get("registration"))
 # ─────────────────────────────────────────────────────────────────────────────
 
 _last_payload = {"flights": [], "source": ""}
