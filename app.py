@@ -372,7 +372,13 @@ def airport_coords(iata):
 def estimate_eta_min(f):
     """Rough remaining-flight-time estimate in minutes: great-circle distance to the
     destination airport divided by current ground speed. Approximate (straight-line,
-    ignores routing/descent) — good enough for a casual spoken estimate, not for real ETA."""
+    ignores routing/descent) — good enough for a casual spoken estimate, not for real ETA.
+
+    Only valid near level flight: right after takeoff, current ground speed is climb
+    speed, not the average cruise speed for the rest of the trip — dividing a long
+    remaining distance by that badly overestimates time left. So during climb/descent
+    (vertical speed beyond a small threshold) we withhold the estimate rather than show
+    a wrong number."""
     dest = f.get("destination_airport_iata")
     if not dest or not f.get("latitude") or not f.get("longitude"):
         return None
@@ -381,6 +387,8 @@ def estimate_eta_min(f):
         return None
     speed = f.get("ground_speed_kmh") or 0
     if speed < 50:  # too slow/stale (taxi, climb-out, data glitch) for a meaningful estimate
+        return None
+    if abs(f.get("vertical_speed_fpm") or 0) > 500:  # actively climbing/descending, not cruising
         return None
     dist = haversine(f["latitude"], f["longitude"], coords[0], coords[1])
     minutes = round(dist / speed * 60)
