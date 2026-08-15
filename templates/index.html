@@ -1767,9 +1767,6 @@ function isEnglishVoice() {
 const _TTS_D_DE = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun'];
 // ICAO/ATC radiotelephony digit pronunciation — English mode doubles as ATC phraseology mode
 const _ATC_D = ['zero','one','two','tree','four','fife','six','seven','eight','niner'];
-const _NATO = {A:'Alpha',B:'Bravo',C:'Charlie',D:'Delta',E:'Echo',F:'Foxtrot',G:'Golf',H:'Hotel',
-    I:'India',J:'Juliett',K:'Kilo',L:'Lima',M:'Mike',N:'November',O:'Oscar',P:'Papa',Q:'Quebec',
-    R:'Romeo',S:'Sierra',T:'Tango',U:'Uniform',V:'Victor',W:'Whiskey',X:'X-ray',Y:'Yankee',Z:'Zulu'};
 
 function normalizeAircraftForTTS(name) {
     if (!name) return name;
@@ -1777,15 +1774,6 @@ function normalizeAircraftForTTS(name) {
     // Airbus A-numbers stay as-is (read naturally as "A three hundred...")
     const digits = isEnglishVoice() ? _ATC_D : _TTS_D_DE;
     return name.replace(/\b(7\d{2})\b/g, m => [...m].map(c => digits[+c]).join(' '));
-}
-
-// Callsign/registration spelled ATC-style: letters → NATO alphabet, digits → ATC digit words
-function atcSpell(str) {
-    if (!str) return '';
-    return [...String(str).toUpperCase()].map(c => {
-        if (/[0-9]/.test(c)) return _ATC_D[+c];
-        return _NATO[c] || '';
-    }).filter(Boolean).join(' ');
 }
 
 // Plain number in ATC digit-by-digit style (distances, minutes, ...)
@@ -1811,7 +1799,7 @@ async function fetchRealEta(flightId, callsign) {
     } catch { return null; }
 }
 
-function etaPhrase(minutes) {
+function etaPhrase(minutes, destName) {
     if (!minutes) return '';
     const en = isEnglishVoice();
     const h = Math.floor(minutes / 60), m = minutes % 60;
@@ -1823,7 +1811,8 @@ function etaPhrase(minutes) {
     } else {
         dur = en ? `${m} minute${m > 1 ? 's' : ''}` : `${m} Minute${m > 1 ? 'n' : ''}`;
     }
-    return en ? `, estimate ${dur} to destination` : `, noch ca. ${dur}`;
+    if (en) return `, estimate ${dur} to ${destName || 'destination'}`;
+    return `, noch ca. ${dur}`;
 }
 
 // Compact card display (not spoken): "1:20" or "45", plus a source label
@@ -1866,21 +1855,17 @@ function buildSpeechText(f) {
     const dest   = apName(f.destination_airport_iata);
     const age    = acAgePhrase(f.year);
 
-    const eta = etaPhrase(f.eta_min);
     if (isEnglishVoice()) {
-        const identRaw = f.flight_number || (f.callsign ? f.callsign.replace(/^[A-Za-z]+/, '') : '');
-        const ident = identRaw ? atcNumber(identRaw) : '';
-        let text = 'Traffic';
-        if (al) text += `, ${al}`;
-        if (ident) text += ` ${ident}`;
-        if (ac) text += `, ${ac}`;
+        let text = [al, ac].filter(Boolean).join(' ');
+        if (origin) text += `${text ? ' ' : ''}started at ${origin}`;
         text += age;
-        text += eta;
-        if (origin && dest) text += `. Route ${origin} to ${dest}.`;
-        else if (dest)      text += `. Inbound ${dest}.`;
-        else                text += '.';
+        const etaEn = etaPhrase(f.eta_min, dest);
+        if (etaEn) text += etaEn;
+        else if (dest) text += `, to ${dest}`;
+        text += '.';
         return text;
     }
+    const eta = etaPhrase(f.eta_min);
     let text = 'Überflug';
     if (al) text += ` von ${al}`;
     if (ac) text += `, ${ac}`;
@@ -2187,7 +2172,7 @@ function buildPassoverText(f) {
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
-    text += etaPhrase(f.eta_min);
+    text += etaPhrase(f.eta_min, dest);
     if (en) {
         if (orig && dest) text += `. Route ${orig} to ${dest}.`;
         else if (dest)    text += `. Inbound ${dest}.`;
@@ -2279,7 +2264,7 @@ function buildBalconyText(f) {
     if (al) text += `, ${al}`;
     if (ac) text += `, ${ac}`;
     text += age;
-    text += etaPhrase(f.eta_min);
+    text += etaPhrase(f.eta_min, dest);
     if (en) {
         if (orig && dest) text += `. Route ${orig} to ${dest}.`;
         else if (dest)    text += `. Inbound ${dest}.`;
