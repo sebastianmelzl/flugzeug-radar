@@ -2,7 +2,10 @@ __pycache__/
 *.pyc
 *.pyo
 sightings.db
+ac_db_cache.json.gz
+aircraft_meta.db
 speak
 speak.swift
 .env
 *.mp3
+.DS_Store
