@@ -571,7 +571,7 @@
         .bc-content { display: flex; flex-direction: column; flex: 1; min-width: 0; }
         .bc-photo {
             position: relative;
-            width: 220px;
+            width: 340px;
             flex-shrink: 0;
             background: #060a14;
             overflow: hidden;
@@ -595,26 +595,26 @@
         .bc-header {
             display: flex; align-items: center;
             justify-content: space-between;
-            padding: 10px 18px 8px;
+            padding: 8px 14px 6px;
             border-bottom: 1px solid #1a2f4a;
-            flex-shrink: 0; gap: 10px;
+            flex-shrink: 0; gap: 8px;
         }
-        .bc-id-block { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+        .bc-id-block { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
         .bc-logo-wrap {
             background: #fff; border-radius: 6px; padding: 3px 8px;
             display: inline-flex; align-items: center; flex-shrink: 0;
         }
         .bc-callsign {
-            font-size: 42px; font-weight: 800; color: #00d4aa;
+            font-size: 32px; font-weight: 800; color: #00d4aa;
             font-family: var(--font-mono); letter-spacing: .03em; line-height: 1;
         }
-        .bc-airline { font-size: 15px; color: #64748b; font-weight: 500; white-space: nowrap; }
+        .bc-airline { font-size: 13px; color: #64748b; font-weight: 500; white-space: nowrap; }
         .bc-dist-block { text-align: right; flex-shrink: 0; }
         .bc-dist-num {
-            font-size: 36px; font-weight: 800; color: #e2e8f0;
+            font-size: 28px; font-weight: 800; color: #e2e8f0;
             line-height: 1; font-family: var(--font-mono);
         }
-        .bc-dist-unit { font-size: 14px; color: #475569; margin-left: 3px; }
+        .bc-dist-unit { font-size: 12px; color: #475569; margin-left: 3px; }
 
         /* ── Odometer rolling digit animation ── */
         .od-wrap { display: inline-flex; align-items: flex-end; vertical-align: bottom; }
@@ -635,13 +635,13 @@
         /* Row 2: Aircraft model + reg + buttons */
         .bc-aircraft-row {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 6px 18px;
+            padding: 5px 14px;
             background: #070c18;
             border-bottom: 1px solid #1a2f4a;
             flex-shrink: 0; gap: 8px; flex-wrap: wrap;
         }
         .bc-aircraft-model {
-            font-size: 28px; font-weight: 700; color: #f0f6ff;
+            font-size: 22px; font-weight: 700; color: #f0f6ff;
             letter-spacing: .02em; line-height: 1.2;
         }
         .bc-aircraft-variant {
@@ -657,25 +657,25 @@
         /* Row 3: Route with radar */
         .bc-route-row {
             display: flex; align-items: center;
-            padding: 10px 18px; flex-shrink: 0; gap: 0;
+            padding: 8px 14px; flex-shrink: 0; gap: 0;
             border-bottom: 1px solid #1a2f4a;
         }
         .bc-ap-block { flex: 1; min-width: 0; }
         .bc-ap-block.right { text-align: right; }
         .bc-iata {
-            font-size: 52px; font-weight: 900; color: #e2e8f0;
+            font-size: 40px; font-weight: 900; color: #e2e8f0;
             letter-spacing: .04em; line-height: 1;
         }
         .bc-city {
-            font-size: 13px; color: #64748b; margin-top: 3px;
+            font-size: 12px; color: #64748b; margin-top: 3px;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .bc-route-mid {
-            flex-shrink: 0; padding: 0 16px;
+            flex-shrink: 0; padding: 0 12px;
             display: flex; align-items: center; justify-content: center;
         }
         .bc-radar-wrap {
-            width: 110px; height: 110px;
+            width: 88px; height: 88px;
             border-radius: 50%;
             overflow: hidden;
             border: 1px solid #1e3a5f;
@@ -691,13 +691,13 @@
             border-bottom: 1px solid #1a2f4a; flex-shrink: 0;
         }
         .bc-stat-item {
-            flex: 1; padding: 7px 10px;
+            flex: 1; padding: 6px 8px;
             border-right: 1px solid #1a2f4a;
             display: flex; flex-direction: column; justify-content: center;
         }
         .bc-stat-item:last-child { border-right: none; }
         .bc-stat-val {
-            font-size: 22px; font-weight: 700; color: #e2e8f0; line-height: 1;
+            font-size: 18px; font-weight: 700; color: #e2e8f0; line-height: 1;
         }
         .bc-stat-lbl {
             font-size: 9px; color: #334155; margin-top: 3px;
@@ -718,7 +718,7 @@
 
         .bc-specs-row {
             display: flex; flex-wrap: wrap; gap: 5px;
-            padding: 8px 14px 12px; border-top: 1px solid #1e3a5f44;
+            padding: 6px 12px 10px; border-top: 1px solid #1e3a5f44;
         }
         .bc-spec-chip {
             background: #1e3a5f55; border: 1px solid #1e3a5f99;
@@ -2541,7 +2541,7 @@ function renderBigCard(f, isNew) {
                 <div class="bc-city">${apName(originIata)}</div>
             </div>
             <div class="bc-route-mid">
-                <div class="bc-radar-wrap">${radarSVG(f, 110)}</div>
+                <div class="bc-radar-wrap">${radarSVG(f, 88)}</div>
             </div>
             <div class="bc-ap-block right">
                 <div class="bc-iata">${destIata || '?'}</div>
