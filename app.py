@@ -637,7 +637,10 @@ def _do_fetch_meta(icao24, fallback_registration=None):
             for k in ("serial_no", "year", "first_flight"):
                 if ps.get(k) and not result.get(k):
                     result[k] = ps[k]
-            if ps.get("photo_url") and not result.get("photo_url"):
+            # adsbdb's "photo" is really airport-data.com's tiny (~150px) thumbnail —
+            # its full-size URL 404s — so a planespotters photo is always an upgrade,
+            # not just a fallback for when adsbdb had nothing.
+            if ps.get("photo_url"):
                 result["photo_url"] = ps["photo_url"]
 
     # Wikimedia: high-res photo (~900px), overrides planespotters thumbnail
@@ -674,8 +677,11 @@ def _ac_meta_worker():
                 cached = _db_get_meta(icao24)
                 # Only treat a cached row as "done" if it actually resolved a registration —
                 # empty misses (aircraft unknown to hexdb/adsbdb) get retried, since the
-                # fallback registration seen live may let a later attempt succeed.
-                is_fresh = (cached and cached.get("registration")
+                # fallback registration seen live may let a later attempt succeed. Rows still
+                # stuck on adsbdb's tiny airport-data.com thumbnail also get retried, since a
+                # planespotters/Wikimedia photo can now replace it (previously never did).
+                stuck_on_thumbnail = "/thumbnails/" in (cached.get("photo_url") or "") if cached else False
+                is_fresh = (cached and cached.get("registration") and not stuck_on_thumbnail
                             and time.time() - cached.get("fetched_at", 0) < _AC_META_MAX_AGE)
                 if not is_fresh:
                     _do_fetch_meta(icao24, fallback_registration=_AC_META_LIVE_REG.get(icao24))

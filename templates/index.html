@@ -124,8 +124,11 @@
         }
         .card-photo {
             position: relative;
-            width: 100%;
-            height: 150px;
+            margin: 12px 14px 0;
+            width: calc(100% - 28px);
+            height: 96px;
+            border-radius: 10px;
+            border: 1px solid #1a2f4a;
             flex-shrink: 0;
             background: #060a14;
             overflow: hidden;
@@ -134,13 +137,7 @@
             width: 100%; height: 100%;
             object-fit: cover; display: block;
         }
-        .card-photo::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: linear-gradient(to bottom, transparent 45%, var(--bg-card) 100%);
-            pointer-events: none;
-        }
-        body.light .card-photo { background: #e2e8f0; }
+        body.light .card-photo { background: #e2e8f0; border-color: #cbd5e1; }
         .card.new-flight {
             border-color: #00d4aa;
             animation: flashIn .8s ease;
@@ -826,7 +823,7 @@
 
             /* ── Regular cards: vertikal stapeln ── */
             .card-body { flex-direction: column; }
-            .card-photo { height: 110px; }
+            .card-photo { height: 78px; margin: 10px 12px 0; width: calc(100% - 24px); }
             .sec, .sec-identity, .sec-route, .sec-live {
                 width: 100% !important;
                 max-width: 100% !important;
