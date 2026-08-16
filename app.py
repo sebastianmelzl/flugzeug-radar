@@ -730,6 +730,12 @@ def _background_poller():
     while True:
         try:
             flights, source = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=150)
+            # source == "error" means both FR24 and the OpenSky fallback failed this
+            # cycle (rate limit / transient network blip) — keep showing the last known
+            # flights instead of broadcasting an empty list to every connected client.
+            if source == "error":
+                socketio.sleep(POLL_INTERVAL_S)
+                continue
             for f in flights:
                 enrich_flight(f)
             payload = {"flights": flights, "source": source}

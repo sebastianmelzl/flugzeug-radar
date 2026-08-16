@@ -3470,7 +3470,10 @@ fetch(`/api/flights?radius=150`)
 const socket = io();
 
 socket.on('flights_update', data => {
-    applyFlightData(data.flights || [], data.source);
+    // A transient upstream failure can come back as an empty list — don't let that
+    // blank out the currently displayed flights, just skip this update.
+    if (!data.flights || !data.flights.length) return;
+    applyFlightData(data.flights, data.source);
 });
 
 socket.on('connect', () => showToast('🔌 Verbunden', '#00d4aa'));
