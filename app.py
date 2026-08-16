@@ -707,6 +707,9 @@ def queue_ac_meta(icao24, registration=None):
             _AC_META_QUEUE.append(k)
 
 
+_connected_clients = set()  # SocketIO session ids currently connected
+
+
 def enrich_flight(f):
     """Attach year/msn/type_name from SQLite meta and CSV cache; queue background fetch."""
     icao24  = (f.get("icao24") or "").lower().strip()
@@ -719,7 +722,11 @@ def enrich_flight(f):
     f["photo_url"]      = (meta or {}).get("photo_url") or ""
     f["eta_min"]        = estimate_eta_min(f)
     f["eta_source"]     = "estimate" if f["eta_min"] else None
-    queue_ac_meta(icao24, f.get("registration"))
+    # The metadata/photo pipeline (hexdb, adsbdb, planespotters, Wikimedia) is only
+    # useful to someone actively watching — skip queuing it while no client is
+    # connected, so that traffic doesn't run 24/7 regardless of page visits.
+    if _connected_clients:
+        queue_ac_meta(icao24, f.get("registration"))
 # ─────────────────────────────────────────────────────────────────────────────
 
 _last_payload = {"flights": [], "source": ""}
@@ -761,8 +768,14 @@ socketio.start_background_task(_background_poller)
 
 @socketio.on("connect")
 def on_connect():
+    _connected_clients.add(request.sid)
     if _last_payload["flights"]:
         socketio.emit("flights_update", _last_payload, to=request.sid)
+
+
+@socketio.on("disconnect")
+def on_disconnect():
+    _connected_clients.discard(request.sid)
 
 
 @app.route("/")
