@@ -181,6 +181,7 @@
             font-family: var(--font-mono); letter-spacing: .03em; line-height: 1;
         }
         .announce-airline { font-size: 20px; color: #cbd5e1; font-weight: 500; margin-top: 6px; }
+        .announce-model { font-size: 17px; color: #64748b; font-weight: 500; margin-top: 3px; }
         .announce-route {
             display: flex; align-items: center; gap: 18px;
             margin-top: 22px; font-size: 34px; font-weight: 900;
@@ -190,6 +191,7 @@
         @media (max-width: 700px) {
             .announce-flightnum { font-size: 34px; }
             .announce-airline { font-size: 14px; }
+            .announce-model { font-size: 12px; }
             .announce-route { font-size: 22px; gap: 10px; margin-top: 14px; }
             .announce-info { padding: 20px 20px 26px; }
         }
@@ -2068,6 +2070,7 @@ function showAnnouncementOverlay(f) {
     document.getElementById('announceFlightNum').textContent = f.flight_number || f.callsign || f.id;
     const airline = airlineName(f.airline_iata, f.airline_icao);
     document.getElementById('announceAirline').textContent = airline || f.callsign || '';
+    document.getElementById('announceModel').textContent = aircraftName(f.aircraft_code) || f.aircraft_code || '';
     document.getElementById('announceOrigin').textContent = f.origin_airport_iata || '?';
     document.getElementById('announceOriginCity').textContent = apName(f.origin_airport_iata) || '';
     document.getElementById('announceDest').textContent = f.destination_airport_iata || '?';
@@ -3765,6 +3768,7 @@ document.addEventListener('keydown', e => {
     <div class="announce-info">
         <div class="announce-flightnum" id="announceFlightNum"></div>
         <div class="announce-airline" id="announceAirline"></div>
+        <div class="announce-model" id="announceModel"></div>
         <div class="announce-route">
             <div>
                 <div id="announceOrigin"></div>
