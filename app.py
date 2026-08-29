@@ -112,8 +112,8 @@ def fetch_flights(lat, lon, radius_km):
             })
         return flights, "fr24"
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[fetch_flights] FR24 failed: {e!r}", flush=True)
 
     try:
         lat_d = radius_km / 111.0
@@ -124,6 +124,9 @@ def fetch_flights(lat, lon, radius_km):
                     "lomin": lon - lon_d, "lomax": lon + lon_d},
             timeout=15,
         )
+        if resp.status_code != 200:
+            print(f"[fetch_flights] OpenSky HTTP {resp.status_code}: {resp.text[:200]}", flush=True)
+            return [], "error"
         data = resp.json()
         for state in data.get("states") or []:
             if state[5] is None or state[6] is None or state[8]:
@@ -152,7 +155,8 @@ def fetch_flights(lat, lon, radius_km):
                 "source": "opensky",
             })
         return flights, "opensky"
-    except Exception:
+    except Exception as e:
+        print(f"[fetch_flights] OpenSky failed: {e!r}", flush=True)
         return [], "error"
 
 
