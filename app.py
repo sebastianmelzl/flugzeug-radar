@@ -76,9 +76,9 @@ def fetch_flights(lat, lon, radius_km):
     flights = []
     try:
         try:
-            from FlightRadar24 import FlightRadar24API      # FlightRadarAPI <= 1.4.x
-        except ModuleNotFoundError:
             from FlightRadarAPI import FlightRadar24API      # FlightRadarAPI >= 1.5.x
+        except ModuleNotFoundError:
+            from FlightRadar24 import FlightRadar24API       # FlightRadarAPI <= 1.4.x
         fr_api = FlightRadar24API()
         bounds = fr_api.get_bounds_by_point(lat, lon, radius_km * 1000)
         raw_flights = fr_api.get_flights(bounds=bounds)
