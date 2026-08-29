@@ -1,5 +1,6 @@
 flask
 gunicorn
+packaging
 FlightRadarAPI
 requests
 edge-tts
