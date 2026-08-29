@@ -3156,6 +3156,7 @@ function toggleSatellite() {
     _satMode = !_satMode;
     localStorage.setItem('mapSat', _satMode ? '1' : '0');
     applyBasemap();
+    if (_map) updateMap(_lastAllFlights);   // recolour grey → white (and back)
 }
 
 function initMap() {
@@ -3233,10 +3234,12 @@ function updateMap(allFlights) {
         }
         const hasStar = _rwy18Stars.has(f.id);
 
-        const color = isSelected ? '#00d4aa' :
+        let color = isSelected ? '#00d4aa' :
             isMilitary(f) ? '#3b82f6' :
             isRwy18Departure(f) ? '#a855f7' :
             overhead ? '#f97316' : (inRadius && isLargeAircraft(f.aircraft_code)) ? '#ef4444' : inRadius ? '#00d4aa' : '#475569';
+        // The dim grey (out-of-radius) planes vanish against satellite imagery — show them white there
+        if (_satMode && color === '#475569') color = '#ffffff';
         const popup = `<b>${f.callsign||f.id}</b><br>${f.airline_iata||f.airline_icao||'–'} · ${f.aircraft_code||'–'}<br>${f.origin_airport_iata||'?'} → ${f.destination_airport_iata||'?'}<br>${f.altitude_ft ? Math.round(f.altitude_ft * 0.3048).toLocaleString('de')+' m' : '–'} · ${f.distance_km} km`;
 
         const onMarkerClick = () => {
