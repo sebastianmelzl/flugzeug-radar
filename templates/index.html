@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flugzeug Radar</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1040,6 +1041,8 @@
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script>
 // Patch L.Marker to use sub-pixel CSS transforms.
 // Leaflet's default update() calls latLngToLayerPoint().round() which forces
@@ -3112,17 +3115,18 @@ function renderFlights(flights, source) {
     try { renderBalconyRadar(); } catch(e) { console.warn('balconyRadar:', e); }
 }
 
-/* ── Leaflet map ── */
-function mapTileUrl() {
+/* ── Leaflet map (OpenFreeMap vector tiles via MapLibre GL — keyless, no watermark) ── */
+const _MAP_ATTRIB = '© <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
+function mapStyleUrl() {
     return document.body.classList.contains('light')
-        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        ? 'https://tiles.openfreemap.org/styles/positron'
+        : 'https://tiles.openfreemap.org/styles/dark';
 }
 
 function initMap() {
     if (_map) return;
-    _map = L.map('map', { zoomControl: true }).setView([DEFAULT_LAT, DEFAULT_LON], 10);
-    _tileLayer = L.tileLayer(mapTileUrl(), { attribution: '© OpenStreetMap © CARTO', maxZoom: 18 }).addTo(_map);
+    _map = L.map('map', { zoomControl: true, maxZoom: 19 }).setView([DEFAULT_LAT, DEFAULT_LON], 10);
+    _tileLayer = L.maplibreGL({ style: mapStyleUrl(), attribution: _MAP_ATTRIB }).addTo(_map);
     L.circleMarker([userLat, userLon], {
         radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
     }).addTo(_map).bindPopup('📍 Dein Standort');
@@ -3567,8 +3571,13 @@ function applyTheme(light) {
     const icon = document.getElementById('themeIcon');
     if (icon) icon.innerHTML = light ? _ICON_MOON : _ICON_SUN;
     if (_map && _tileLayer) {
-        _map.removeLayer(_tileLayer);
-        _tileLayer = L.tileLayer(mapTileUrl(), { attribution: '© OpenStreetMap © CARTO', maxZoom: 18 }).addTo(_map);
+        const gl = _tileLayer.getMaplibreMap && _tileLayer.getMaplibreMap();
+        if (gl) {
+            gl.setStyle(mapStyleUrl());
+        } else {
+            _map.removeLayer(_tileLayer);
+            _tileLayer = L.maplibreGL({ style: mapStyleUrl(), attribution: _MAP_ATTRIB }).addTo(_map);
+        }
     }
 }
 
