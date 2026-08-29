@@ -735,6 +735,13 @@ _last_payload = {"flights": [], "source": ""}
 def _background_poller():
     logged_ids = set()
     while True:
+        # Only poll the flight APIs (and feed the sightings statistics) while
+        # someone actually has the dashboard open — otherwise the tracker would
+        # generate traffic 24/7 regardless of page visits.
+        if not _connected_clients:
+            logged_ids.clear()
+            socketio.sleep(2)
+            continue
         try:
             flights, source = fetch_flights(DEFAULT_LAT, DEFAULT_LON, radius_km=150)
             # source == "error" means both FR24 and the OpenSky fallback failed this
