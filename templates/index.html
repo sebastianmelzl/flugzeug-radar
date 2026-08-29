@@ -520,12 +520,15 @@
         #mapResetBtn:hover { background:#00d4aa; color:#0f172a; }
         body.light #mapResetBtn { background:#fff; color:#0ea5e9; border-color:#0ea5e944; }
         body.light #mapResetBtn:hover { background:#0ea5e9; color:#fff; }
-        #mapFraBtn, #mapHomeBtn { display:flex; position:absolute; bottom:10px; z-index:1000; align-items:center; gap:5px; background:#1e293b; color:#94a3b8; border:1px solid #334155; border-radius:8px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 8px #0005; }
+        #mapFraBtn, #mapHomeBtn, #mapSatBtn { display:flex; position:absolute; bottom:10px; z-index:1000; align-items:center; gap:5px; background:#1e293b; color:#94a3b8; border:1px solid #334155; border-radius:8px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 8px #0005; }
         #mapFraBtn { left:10px; }
         #mapHomeBtn { left:90px; }
-        #mapFraBtn:hover, #mapHomeBtn:hover { border-color:#00d4aa; color:#00d4aa; }
-        body.light #mapFraBtn, body.light #mapHomeBtn { background:#fff; color:#374151; border-color:#cbd5e1; }
-        body.light #mapFraBtn:hover, body.light #mapHomeBtn:hover { border-color:#0284c7; color:#0284c7; }
+        #mapSatBtn { right:10px; }
+        #mapFraBtn:hover, #mapHomeBtn:hover, #mapSatBtn:hover { border-color:#00d4aa; color:#00d4aa; }
+        #mapSatBtn.active { border-color:#00d4aa; color:#00d4aa; background:#00d4aa1a; }
+        body.light #mapFraBtn, body.light #mapHomeBtn, body.light #mapSatBtn { background:#fff; color:#374151; border-color:#cbd5e1; }
+        body.light #mapFraBtn:hover, body.light #mapHomeBtn:hover, body.light #mapSatBtn:hover { border-color:#0284c7; color:#0284c7; }
+        body.light #mapSatBtn.active { border-color:#0284c7; color:#0284c7; background:#0284c71a; }
         #map { height: 100%; }
         .flight-marker { font-size: 18px; line-height: 1; filter: drop-shadow(0 0 3px #000c); cursor: pointer; }
         .leaflet-popup-content-wrapper { background: #0d1528; border: 1px solid #1e3a5f; color: #e2e8f0; border-radius: 10px; }
@@ -961,7 +964,7 @@
 
             /* ── Map ── */
             #mapWrap { height: 260px; }
-            #mapFraBtn, #mapHomeBtn { font-size: 11px; padding: 5px 9px; }
+            #mapFraBtn, #mapHomeBtn, #mapSatBtn { font-size: 11px; padding: 5px 9px; }
         }
 
         @media (max-width: 400px) {
@@ -1023,6 +1026,7 @@
     <button id="mapResetBtn" onclick="resetMapSelection()">↩ Zurück</button>
     <button id="mapFraBtn" onclick="if(_map)_map.setView([50.0379,8.5622],12)" title="Zoom auf FRA">✈ FRA</button>
     <button id="mapHomeBtn" onclick="if(_map)_map.setView([DEFAULT_LAT,DEFAULT_LON],12)" title="Zoom auf Reinheim">📍 Reinheim</button>
+    <button id="mapSatBtn" onclick="toggleSatellite()" title="Satellitenbild ein/aus">🛰 Satellit</button>
 </div>
 
 <main>
@@ -3117,16 +3121,47 @@ function renderFlights(flights, source) {
 
 /* ── Leaflet map (OpenFreeMap vector tiles via MapLibre GL — keyless, no watermark) ── */
 const _MAP_ATTRIB = '© <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
+const _SAT_ATTRIB = 'Imagery © <a href="https://www.esri.com" target="_blank" rel="noreferrer">Esri</a>, Maxar, Earthstar Geographics';
 function mapStyleUrl() {
     return document.body.classList.contains('light')
         ? 'https://tiles.openfreemap.org/styles/positron'
         : 'https://tiles.openfreemap.org/styles/dark';
 }
 
+let _satMode = localStorage.getItem('mapSat') === '1';
+
+function makeVectorLayer() {
+    return L.maplibreGL({ style: mapStyleUrl(), attribution: _MAP_ATTRIB });
+}
+function makeSatLayer() {
+    const esri = (svc, ext) => L.tileLayer(
+        `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
+        { maxZoom: 19, attribution: _SAT_ATTRIB });
+    return L.layerGroup([
+        esri('World_Imagery'),
+        esri('Reference/World_Transportation'),
+        esri('Reference/World_Boundaries_and_Places'),
+    ]);
+}
+
+function applyBasemap() {
+    if (!_map) return;
+    if (_tileLayer) { _map.removeLayer(_tileLayer); _tileLayer = null; }
+    _tileLayer = (_satMode ? makeSatLayer() : makeVectorLayer()).addTo(_map);
+    const btn = document.getElementById('mapSatBtn');
+    if (btn) btn.classList.toggle('active', _satMode);
+}
+
+function toggleSatellite() {
+    _satMode = !_satMode;
+    localStorage.setItem('mapSat', _satMode ? '1' : '0');
+    applyBasemap();
+}
+
 function initMap() {
     if (_map) return;
     _map = L.map('map', { zoomControl: true, maxZoom: 19 }).setView([DEFAULT_LAT, DEFAULT_LON], 10);
-    _tileLayer = L.maplibreGL({ style: mapStyleUrl(), attribution: _MAP_ATTRIB }).addTo(_map);
+    applyBasemap();
     L.circleMarker([userLat, userLon], {
         radius: 7, color: '#00d4aa', fillColor: '#00d4aa', fillOpacity: 1, weight: 2
     }).addTo(_map).bindPopup('📍 Dein Standort');
@@ -3570,14 +3605,10 @@ function applyTheme(light) {
     document.body.classList.toggle('light', light);
     const icon = document.getElementById('themeIcon');
     if (icon) icon.innerHTML = light ? _ICON_MOON : _ICON_SUN;
-    if (_map && _tileLayer) {
+    if (_map && _tileLayer && !_satMode) {   // satellite view has no light/dark variant
         const gl = _tileLayer.getMaplibreMap && _tileLayer.getMaplibreMap();
-        if (gl) {
-            gl.setStyle(mapStyleUrl());
-        } else {
-            _map.removeLayer(_tileLayer);
-            _tileLayer = L.maplibreGL({ style: mapStyleUrl(), attribution: _MAP_ATTRIB }).addTo(_map);
-        }
+        if (gl) gl.setStyle(mapStyleUrl());
+        else applyBasemap();
     }
 }
 
